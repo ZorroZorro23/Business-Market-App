@@ -1,43 +1,352 @@
-<script>
-        let map, circle, service, markers = [], data = [];
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AtlasGo Market Scanner</title>
+    <style>
+        /* Dark Mode Professional Theme */
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #eee; display: flex; height: 100vh; overflow: hidden; }
         
+        #sidebar { width: 350px; background: #222; border-right: 1px solid #444; padding: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 10; box-shadow: 2px 0 10px #000; }
+        h2 { color: #3b82f6; margin: 0 0 10px 0; font-size: 22px; }
+        label { font-size: 11px; color: #aaa; font-weight: bold; display: block; margin-bottom: 3px; }
+        
+        input, select, button { width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: white; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px; }
+        button { font-weight: bold; cursor: pointer; text-transform: uppercase; border: none; transition: 0.2s; }
+        
+        .btn-scan { background: #3b82f6; margin-top: 5px; } 
+        .btn-scan:hover { background: #2563eb; }
+        .btn-geo { background: transparent; border: 1px solid #27ae60; color: #27ae60; margin-bottom: 15px; }
+        .btn-geo:hover { background: rgba(39, 174, 96, 0.1); }
+        .btn-csv { background: #444; } 
+        .btn-csv:hover { background: #555; }
+        
+        #results { flex: 1; overflow-y: auto; border-top: 1px solid #444; padding-top: 10px; }
+        
+        /* Carduri Rezultate */
+        .card { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; position: relative; transition: 0.2s; display: flex; gap: 10px; }
+        .card:hover { background: #2a2a2a; border-left: 3px solid #3b82f6; }
+        .place-img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; background: #444; }
+        .place-info { flex: 1; }
+        
+        /* ZONA NOUA PENTRU RUTE DETALIATE */
+        .route-info { font-size: 11px; color: #27ae60; margin-top: 5px; font-weight: bold; display: none; }
+        .transit-steps { 
+            font-size: 10px; color: #ddd; margin-top: 4px; 
+            background: rgba(255,255,255,0.1); padding: 4px; border-radius: 4px;
+        }
+        .step-badge {
+            display: inline-block; background: #333; border: 1px solid #555; 
+            padding: 1px 4px; border-radius: 3px; margin-right: 3px; margin-bottom: 2px;
+        }
+
+        .best-badge { position: absolute; top: 8px; right: 8px; background: #27ae60; font-size: 9px; padding: 2px 5px; border-radius: 3px; }
+
+        /* Fereastra Street View */
+        #sv-panel {
+            position: absolute; bottom: 30px; right: 20px;
+            width: 350px; height: 250px;
+            background: #000; border: 3px solid #fff; border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+            display: none; z-index: 99; overflow: hidden;
+        }
+        #sv-container { width: 100%; height: 100%; }
+        #sv-close { 
+            position: absolute; top: 5px; right: 5px; 
+            background: #e74c3c; color: white; border: none; 
+            width: 25px; height: 25px; border-radius: 50%; 
+            font-weight: bold; cursor: pointer; z-index: 100;
+        }
+        #sv-label {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: rgba(0,0,0,0.6); color: white;
+            font-size: 10px; padding: 5px; text-align: center; pointer-events: none; z-index: 99;
+        }
+
+        #map { flex: 1; height: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h2>AtlasGo <span style="font-size:12px; color:#888">v3.3 Student</span></h2>
+        
+        <button class="btn-geo" onclick="locateUser()">📍 Localizează-mă (GPS)</button>
+
+        <label>CAUTA ORAS</label>
+        <input id="city" type="text" placeholder="Ex: Voluntari...">
+
+        <label>CATEGORIE</label>
+        <select id="cat">
+            <option value="convenience_store">Magazine / Minimarket</option>
+            <option value="gas_station">Benzinarii</option>
+            <option value="restaurant|cafe">Restaurante</option>
+            <option value="tourist_attraction">Turism</option>
+            <option value="spa|park">Relaxare</option>
+            <option value="pharmacy">Farmacii</option>
+            <option value="gym">Sala Fitness</option>
+        </select>
+
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1">
+                <label>MOD TRANSPORT</label>
+                <select id="travelMode" onchange="updateRouteMode()">
+                    <option value="DRIVING">🚗 Mașină</option>
+                    <option value="TRANSIT" selected>🚌 Autobuz/Metrou</option>
+                    <option value="WALKING">🚶 Jos</option>
+                    <option value="BICYCLING">🚴 Bicicletă</option>
+                </select>
+            </div>
+            <div style="flex:1">
+                <label>RAZA: <span id="rVal">1500</span>m</label>
+                <input id="rad" type="range" min="500" max="10000" value="1500" step="100" oninput="document.getElementById('rVal').innerText=this.value">
+            </div>
+        </div>
+
+        <label>SORTARE</label>
+        <select id="sort">
+            <option value="dist">Distanta (Cel mai aproape)</option>
+            <option value="rate">Rating (Cel mai bun)</option>
+            <option value="best">Balansat (Best Match)</option>
+        </select>
+
+        <button class="btn-scan" onclick="runScan()">Scaneaza Zona</button>
+        <button class="btn-csv" onclick="getCSV()">Exporta CSV</button>
+        
+        <div style="font-size:11px; color:#666; margin-top:5px">Rezultate: <span id="count">0</span></div>
+        <div id="results"></div>
+    </div>
+
+    <div style="position:relative; flex:1">
+        <div id="map"></div>
+        <div id="sv-panel">
+            <button id="sv-close" onclick="document.getElementById('sv-panel').style.display='none'">X</button>
+            <div id="sv-container"></div>
+            <div id="sv-label">Street View Interactiv</div>
+        </div>
+    </div>
+
+    <script>
+        let map, circle, service, directionsService, directionsRenderer;
+        let miniStreetView; 
+        let markers = [];
+        let exportData = [];
+        let userPos = { lat: 44.4268, lng: 26.1025 }; 
+        
+        let currentSelectedDest = null; 
+        let currentSelectedMsgId = null;
+
         function initMap() {
-            const start = { lat: 44.4268, lng: 26.1025 }; // Default Bucharest
-            map = new google.maps.Map(document.getElementById("map"), { center: start, zoom: 13, disableDefaultUI: true });
-            
-            circle = new google.maps.Circle({ map, center: start, radius: 1000, fillColor: '#3b82f6', fillOpacity: 0.2, strokeColor: '#3b82f6', editable: true });
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: userPos, zoom: 13, 
+                disableDefaultUI: false, streetViewControl: true, mapTypeControl: false
+            });
+
+            new google.maps.TransitLayer().setMap(map);
+
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                map: map, suppressMarkers: true,
+                polylineOptions: { strokeColor: "#3b82f6", strokeWeight: 6, strokeOpacity: 0.7 }
+            });
+
+            miniStreetView = new google.maps.StreetViewPanorama(
+                document.getElementById("sv-container"), {
+                    position: userPos,
+                    pov: { heading: 34, pitch: 10 },
+                    visible: true,
+                    disableDefaultUI: false, 
+                    zoomControl: true,
+                    panControl: true
+                }
+            );
+
+            circle = new google.maps.Circle({
+                map, center: userPos, radius: 1500,
+                fillColor: '#3b82f6', fillOpacity: 0.1, strokeColor: '#3b82f6', strokeWeight: 2,
+                editable: true, draggable: true
+            });
+            circle.addListener('center_changed', () => { userPos = circle.getCenter(); });
+
             service = new google.maps.places.PlacesService(map);
             
-            const autocomplete = new google.maps.places.Autocomplete(document.getElementById('search'));
-            autocomplete.bindTo('bounds', map);
-            autocomplete.addListener('place_changed', () => {
-                const p = autocomplete.getPlace();
-                if(p.geometry) { map.setCenter(p.geometry.location); circle.setCenter(p.geometry.location); }
+            const ac = new google.maps.places.Autocomplete(document.getElementById('city'));
+            ac.bindTo('bounds', map);
+            ac.addListener('place_changed', () => {
+                const p = ac.getPlace();
+                if(p.geometry) { userPos = p.geometry.location; updateMapCenter(); }
             });
         }
 
-        function findPlaces() {
-            const rad = parseInt(document.getElementById('rad').value);
-            circle.setRadius(rad);
-            // Search for generic business terms
-            service.nearbySearch({ location: circle.getCenter(), radius: rad, keyword: "store restaurant" }, (res, status) => {
-                document.getElementById('results').innerHTML = ''; markers.forEach(m => m.setMap(null)); markers = []; data = [];
-                if(status === 'OK') {
-                    res.forEach(p => {
-                        data.push(p);
-                        new google.maps.Marker({ map, position: p.geometry.location, title: p.name });
-                        document.getElementById('results').innerHTML += `<div class="item"><b>${p.name}</b><br>Rating: ${p.rating||'N/A'}</div>`;
+        function locateUser() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (p) => { userPos = { lat: p.coords.latitude, lng: p.coords.longitude }; updateMapCenter(); },
+                    () => { alert("Eroare GPS."); }
+                );
+            } else { alert("Fara suport GPS."); }
+        }
+
+        function updateMapCenter() {
+            map.setCenter(userPos); map.setZoom(15); circle.setCenter(userPos);
+        }
+
+        function updateRouteMode() {
+            if(currentSelectedDest && currentSelectedMsgId) {
+                calculateAndDisplayRoute(currentSelectedDest, currentSelectedMsgId);
+            }
+        }
+
+        function runScan() {
+            const r = parseInt(document.getElementById('rad').value);
+            const c = document.getElementById('cat').value;
+            const s = document.getElementById('sort').value;
+            
+            circle.setRadius(r);
+            directionsRenderer.setDirections({routes: []});
+            document.getElementById('sv-panel').style.display = 'none';
+            currentSelectedDest = null; 
+
+            const req = { location: circle.getCenter(), radius: r, keyword: c.replace("|", " ") };
+
+            service.nearbySearch(req, (res, status) => {
+                const list = document.getElementById('results');
+                list.innerHTML = '';
+                markers.forEach(m => m.setMap(null));
+                markers = [];
+                exportData = [];
+
+                if(status === 'OK' && res) {
+                    res.forEach(p => p.realDist = google.maps.geometry.spherical.computeDistanceBetween(circle.getCenter(), p.geometry.location));
+                    const filtered = res.filter(p => p.realDist <= r);
+                    document.getElementById('count').innerText = filtered.length;
+
+                    if(s === 'dist') filtered.sort((a,b) => a.realDist - b.realDist);
+                    else if (s === 'rate') filtered.sort((a,b) => (b.rating||0) - (a.rating||0));
+                    else filtered.sort((a,b) => ((b.rating||0)*1000 - b.realDist) - ((a.rating||0)*1000 - a.realDist));
+
+                    filtered.forEach((p, idx) => {
+                        exportData.push(p);
+                        markers.push(new google.maps.Marker({ map, position: p.geometry.location, title: p.name }));
+
+                        let badge = idx === 0 ? '<div class="best-badge">BEST</div>' : '';
+                        let thumbUrl = (p.photos && p.photos.length) ? p.photos[0].getUrl({maxWidth:100}) : "https://via.placeholder.com/60?text=NoImg";
+
+                        list.innerHTML += `
+                            <div class="card" onclick="selectLocation(${p.geometry.location.lat()}, ${p.geometry.location.lng()}, 'route-msg-${idx}')">
+                                <img src="${thumbUrl}" class="place-img">
+                                <div class="place-info">
+                                    ${badge}
+                                    <b>${p.name}</b><br>
+                                    <span style="color:#f1c40f">${p.rating||'-'} ★</span> | 
+                                    <span style="color:#aaa; font-size:11px">${Math.round(p.realDist)}m</span>
+                                    <div id="route-msg-${idx}" class="route-info">...</div>
+                                    <div id="steps-${idx}" class="transit-steps"></div>
+                                </div>
+                            </div>`;
                     });
+                } else {
+                    list.innerHTML = '<div style="padding:10px; color:#777">Niciun rezultat.</div>';
                 }
             });
         }
 
-        function exportCSV() {
-            if(!data.length) return alert("Scan first!");
-            let csv = "Name,Address,Rating\n" + data.map(p => `"${p.name}","${p.vicinity}",${p.rating}`).join("\n");
-            const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv); a.download = 'market_data.csv'; a.click();
+        function selectLocation(lat, lng, msgId) {
+            const dest = { lat: lat, lng: lng };
+            currentSelectedDest = dest;
+            currentSelectedMsgId = msgId;
+
+            const panel = document.getElementById('sv-panel');
+            panel.style.display = 'block';
+            miniStreetView.setPosition(dest); 
+            
+            const svService = new google.maps.StreetViewService();
+            svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
+                if (status !== 'OK') {
+                    panel.style.display = 'none'; 
+                }
+            });
+
+            calculateAndDisplayRoute(dest, msgId);
+        }
+
+        function calculateAndDisplayRoute(dest, msgId) {
+            const mode = document.getElementById('travelMode').value;
+            
+            const req = {
+                origin: userPos,
+                destination: dest,
+                travelMode: google.maps.TravelMode[mode],
+                provideRouteAlternatives: true 
+            };
+
+            // Resetare UI
+            document.querySelectorAll('.route-info').forEach(e => e.style.display = 'none');
+            document.querySelectorAll('.transit-steps').forEach(e => e.innerHTML = '');
+
+            const div = document.getElementById(msgId);
+            const stepsDiv = document.getElementById(msgId.replace('route-msg-', 'steps-'));
+            
+            div.style.display = 'block';
+            div.innerText = "Calculare...";
+
+            directionsService.route(req, (res, status) => {
+                if (status == 'OK') {
+                    directionsRenderer.setDirections(res);
+                    const leg = res.routes[0].legs[0];
+                    
+                    let icon = "🚗";
+                    if(mode === "TRANSIT") icon = "🚌";
+                    if(mode === "WALKING") icon = "🚶";
+                    if(mode === "BICYCLING") icon = "🚴";
+
+                    // --- PARSARE DETALIATA TRANSIT ---
+                    let stepSummary = "";
+                    
+                    if (mode === "TRANSIT") {
+                         leg.steps.forEach(step => {
+                            if (step.travel_mode === "TRANSIT" && step.transit) {
+                                // Autobuz/Metrou gasit
+                                let line = step.transit.line.short_name || step.transit.line.name;
+                                let vehicle = step.transit.line.vehicle.name; // "Autobuz", "Tramvai", etc.
+                                stepSummary += `<span class="step-badge" style="background:#2980b9">${vehicle} ${line}</span> `;
+                            } else if (step.travel_mode === "WALKING") {
+                                stepSummary += `<span class="step-badge">🚶 ${step.duration.text}</span> `;
+                            }
+                         });
+                    }
+                    
+                    // Afisare
+                    div.innerHTML = `${icon} ${leg.duration.text} (${leg.distance.text})`;
+                    if (stepSummary) {
+                        stepsDiv.innerHTML = "Traseu: " + stepSummary;
+                    } else if (mode === "TRANSIT") {
+                        stepsDiv.innerHTML = "Doar mers pe jos (prea aproape).";
+                    }
+
+                } else {
+                    div.innerText = "Nu exista ruta.";
+                }
+            });
+        }
+
+        function getCSV() {
+            if(!exportData.length) return alert("Scaneaza intai o zona!");
+            let csv = "Nume,Rating,Distanta(m),Adresa\n";
+            exportData.forEach(p => {
+                let n = p.name.replace(/,/g, '');
+                let a = (p.vicinity||'').replace(/,/g, '');
+                csv += `${n},${p.rating||0},${Math.round(p.realDist)},${a}\n`;
+            });
+            const b = new Blob([csv], {type:'text/csv'});
+            const u = URL.createObjectURL(b);
+            const l = document.createElement('a');
+            l.href = u; l.download = 'analiza_piata.csv';
+            l.click();
         }
     </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCvbL5aBjXtO-_61bYgMKj2G9o3sEtztGY&libraries=places&callback=initMap" async defer></script>
+    
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCvbL5aBjXtO-_61bYgMKj2G9o3sEtztGY&libraries=places,geometry&callback=initMap" async defer></script>
 </body>
 </html>
