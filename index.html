@@ -1,0 +1,43 @@
+<script>
+        let map, circle, service, markers = [], data = [];
+        
+        function initMap() {
+            const start = { lat: 44.4268, lng: 26.1025 }; // Default Bucharest
+            map = new google.maps.Map(document.getElementById("map"), { center: start, zoom: 13, disableDefaultUI: true });
+            
+            circle = new google.maps.Circle({ map, center: start, radius: 1000, fillColor: '#3b82f6', fillOpacity: 0.2, strokeColor: '#3b82f6', editable: true });
+            service = new google.maps.places.PlacesService(map);
+            
+            const autocomplete = new google.maps.places.Autocomplete(document.getElementById('search'));
+            autocomplete.bindTo('bounds', map);
+            autocomplete.addListener('place_changed', () => {
+                const p = autocomplete.getPlace();
+                if(p.geometry) { map.setCenter(p.geometry.location); circle.setCenter(p.geometry.location); }
+            });
+        }
+
+        function findPlaces() {
+            const rad = parseInt(document.getElementById('rad').value);
+            circle.setRadius(rad);
+            // Search for generic business terms
+            service.nearbySearch({ location: circle.getCenter(), radius: rad, keyword: "store restaurant" }, (res, status) => {
+                document.getElementById('results').innerHTML = ''; markers.forEach(m => m.setMap(null)); markers = []; data = [];
+                if(status === 'OK') {
+                    res.forEach(p => {
+                        data.push(p);
+                        new google.maps.Marker({ map, position: p.geometry.location, title: p.name });
+                        document.getElementById('results').innerHTML += `<div class="item"><b>${p.name}</b><br>Rating: ${p.rating||'N/A'}</div>`;
+                    });
+                }
+            });
+        }
+
+        function exportCSV() {
+            if(!data.length) return alert("Scan first!");
+            let csv = "Name,Address,Rating\n" + data.map(p => `"${p.name}","${p.vicinity}",${p.rating}`).join("\n");
+            const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv); a.download = 'market_data.csv'; a.click();
+        }
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_API_KEY&libraries=places&callback=initMap" async defer></script>
+</body>
+</html>
