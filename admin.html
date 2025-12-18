@@ -128,7 +128,30 @@
 
     window.loadData = async function loadData(){
       const days = parseInt(document.getElementById("days").value, 10);
- 
+      document.getElementById("rangeLabel").innerText = `ultimele ${days} zile`;
+      
+      const snap = await getDocs(collection(db, "events"));
+      const since = daysAgoDate(days).getTime();
+
+      let scans = 0, selects = 0;
+      const sessions = new Set();
+      const topCats = {};
+      const topPlaces = {};
+
+      snap.forEach(doc=>{
+        const e = doc.data();
+        let ms = 0;
+        try{ ms = e.ts?.toDate?.().getTime?.() || 0; }catch(_){ ms = 0; }
+        
+        if (ms && ms < since) return; // filtram dupa data
+        
+        sessions.add(e.sessionId || "unknown");
+
+        if(e.type === "scan"){
+          scans++;
+          const cat = e.payload?.category || "unknown";
+          topCats[cat] = (topCats[cat]||0) + 1;
+        }
         if(e.type === "select_place"){
           selects++;
           const pid = e.payload?.placeId || "no_placeId";
