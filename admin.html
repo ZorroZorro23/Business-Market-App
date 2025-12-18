@@ -72,4 +72,79 @@
         </table>
       </div>
 
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <b>Top locuri selectate</b>
+          <span class="muted">după placeId</span>
+        </div>
+        <table>
+          <thead><tr><th>placeId</th><th>Click-uri</th></tr></thead>
+          <tbody id="topPlaces"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <b>Notă pentru proiect</b>
+      <div class="muted" style="margin-top:6px;">
+        Aceste date vin live din baza de date Cloud Firestore. Acest dashboard demonstrează componenta de analiză a utilizatorilor cerută la Milestone 3.
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // AICI ESTE CONFIGURATIA TA REALA (Am pus-o eu deja)
+    const firebaseConfig = {
+      apiKey: "AIzaSyC7a_97XoJn58dXB2c2wdez_MkBy9X50f8",
+      authDomain: "atlas-e5b69.firebaseapp.com",
+      projectId: "atlas-e5b69",
+      storageBucket: "atlas-e5b69.firebasestorage.app",
+      messagingSenderId: "880434544456",
+      appId: "1:880434544456:web:caa2718bb344a1bb3a3d7d",
+      measurementId: "G-NQJTWMJCZJ"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    function daysAgoDate(days){
+      const d = new Date(); d.setDate(d.getDate() - days); return d;
+    }
+    function setText(id, v){ document.getElementById(id).innerText = v; }
+    function renderTopMap(tbodyId, mapObj, maxRows=10){
+      const entries = Object.entries(mapObj).sort((a,b)=>b[1]-a[1]).slice(0,maxRows);
+      const tb = document.getElementById(tbodyId);
+      tb.innerHTML = "";
+      if(!entries.length){ tb.innerHTML = `<tr><td colspan="2" class="muted">Nimic încă.</td></tr>`; return; }
+      entries.forEach(([k,v])=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${k}</td><td>${v}</td>`;
+        tb.appendChild(tr);
+      });
+    }
+
+    window.loadData = async function loadData(){
+      const days = parseInt(document.getElementById("days").value, 10);
  
+        if(e.type === "select_place"){
+          selects++;
+          const pid = e.payload?.placeId || "no_placeId";
+          topPlaces[pid] = (topPlaces[pid]||0) + 1;
+        }
+      });
+
+      setText("kpiSessions", sessions.size);
+      setText("kpiScans", scans);
+      setText("kpiSelect", selects);
+      renderTopMap("topCats", topCats, 10);
+      renderTopMap("topPlaces", topPlaces, 10);
+    }
+    
+    // Auto load la deschidere
+    loadData();
+  </script>
+</body>
+</html>
