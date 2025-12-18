@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AtlasGo Admin Dashboard</title>
+  <style>
+    body{ margin:0; font-family:Segoe UI, sans-serif; background:#111; color:#eee; }
+    header{ padding:16px 20px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center; }
+    a{ color:#3b82f6; text-decoration:none; }
+    .wrap{ padding:20px; max-width:1100px; margin:0 auto; }
+    .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .card{ background:#1b1b1b; border:1px solid #2c2c2c; border-radius:10px; padding:14px; }
+    .kpi{ font-size:28px; font-weight:800; }
+    .muted{ color:#aaa; font-size:12px; }
+    table{ width:100%; border-collapse:collapse; }
+    th,td{ padding:10px; border-bottom:1px solid #2a2a2a; text-align:left; font-size:13px; }
+    th{ color:#bbb; font-weight:700; }
+    .row{ display:flex; gap:12px; margin-top:12px; }
+    .row .card{ flex:1; }
+    button{ padding:10px 12px; background:#3b82f6; border:none; border-radius:8px; color:#fff; font-weight:700; cursor:pointer; }
+    button:hover{ background:#2563eb; }
+    input,select{ padding:10px; background:#1b1b1b; border:1px solid #333; color:#eee; border-radius:8px; }
+    .controls{ display:flex; gap:10px; align-items:center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <b>AtlasGo Admin</b> <span class="muted">Dashboard (Firestore)</span>
+    </div>
+    <div class="controls">
+      <label class="muted">Interval</label>
+      <select id="days">
+        <option value="7">7 zile</option>
+        <option value="30" selected>30 zile</option>
+        <option value="90">90 zile</option>
+      </select>
+      <button onclick="loadData()">Refresh</button>
+      <a href="./index.html">Înapoi la aplicație</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="card">
+        <div class="muted">Sesiuni unice (aprox.)</div>
+        <div class="kpi" id="kpiSessions">-</div>
+        <div class="muted">număr sessionId diferite</div>
+      </div>
+      <div class="card">
+        <div class="muted">Scanări</div>
+        <div class="kpi" id="kpiScans">-</div>
+        <div class="muted">evenimente de tip scan</div>
+      </div>
+      <div class="card">
+        <div class="muted">Selectări loc</div>
+        <div class="kpi" id="kpiSelect">-</div>
+        <div class="muted">evenimente select_place</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <b>Top categorii</b>
+          <span class="muted" id="rangeLabel"></span>
+        </div>
+        <table>
+          <thead><tr><th>Categorie</th><th>Scanări</th></tr></thead>
+          <tbody id="topCats"></tbody>
+        </table>
+      </div>
+
+ 
