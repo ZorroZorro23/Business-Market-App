@@ -1,4 +1,3 @@
-/* Dark Mode Professional Theme */
 body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #eee; display: flex; height: 100vh; overflow: hidden; }
 
 #sidebar { width: 350px; background: #222; border-right: 1px solid #444; padding: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 10; box-shadow: 2px 0 10px #000; }
@@ -17,7 +16,6 @@ button { font-weight: bold; cursor: pointer; text-transform: uppercase; border: 
 
 #results { flex: 1; overflow-y: auto; border-top: 1px solid #444; padding-top: 10px; min-height: 0; }
 
-/* Carduri Rezultate */
 .card { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; position: relative; transition: 0.2s; display: flex; gap: 10px; }
 .card:hover { background: #2a2a2a; border-left: 3px solid #3b82f6; }
 .place-img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; background: #444; }
@@ -35,7 +33,6 @@ button { font-weight: bold; cursor: pointer; text-transform: uppercase; border: 
 
 .best-badge { position: absolute; top: 8px; right: 8px; background: #27ae60; font-size: 9px; padding: 2px 5px; border-radius: 3px; }
 
-/* Fereastra Street View */
 #sv-panel {
   position: absolute; bottom: 30px; right: 20px;
   width: 350px; height: 250px;
@@ -58,11 +55,9 @@ button { font-weight: bold; cursor: pointer; text-transform: uppercase; border: 
 
 #map { flex: 1; height: 100%; }
 
-/* --- MOBILE OPTIMIZATION (Fix pentru Scroll) --- */
 @media (max-width: 768px) {
   body { flex-direction: column; }
 
-  /* 1. Meniul ocupa 60% din ecran (mai mult loc pt rezultate) */
   #sidebar {
     width: 100%;
     height: 60vh;
@@ -73,25 +68,21 @@ button { font-weight: bold; cursor: pointer; text-transform: uppercase; border: 
     gap: 5px; /* Spatiu mai mic intre elemente */
   }
 
-  /* 2. Harta ocupa 40% din ecran */
   #map {
     width: 100%;
     height: 40vh;
     order: 1;
   }
 
-  /* 3. ASCUNDEM elementele care ocupa loc degeaba pe mobil */
   h2 { display: none; } /* Ascundem titlul */
   .btn-csv { display: none; } /* Ascundem export CSV */
   label { display: none; } /* Ascundem etichetele TEXT */
 
-  /* 4. Butoane mai compacte */
   input, select, button {
     padding: 8px; margin-bottom: 5px; font-size: 13px;
   }
   .btn-geo { margin-bottom: 5px; padding: 5px; }
 
-  /* 5. FIX SCROLL: Lista primeste tot spatiul ramas */
   #results {
     height: 100%;
     overflow-y: auto; /* Activeaza scroll */
