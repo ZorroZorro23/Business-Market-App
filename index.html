@@ -75,10 +75,8 @@
   <!-- Firebase separat (module) -->
   <script type="module" src="./assets/firebase.js"></script>
 
-  <!-- App logic separat (IMPORTANT: înainte de Google Maps ca să existe initMap) -->
   <script src="./assets/app.js" defer></script>
 
-  <!-- IMPORTANT: am scos `async` ca să NU se cheme callback înainte să existe initMap -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCvbL5aBjXtO-_61bYgMKj2G9o3sEtztGY&libraries=places,geometry&callback=initMap" defer></script>
 </body>
 </html>
