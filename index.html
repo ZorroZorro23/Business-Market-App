@@ -4,9 +4,111 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>AtlasGo Market Scanner</title>
+  <style>
+    body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #eee; display: flex; height: 100vh; overflow: hidden; }
+    #sidebar { width: 350px; background: #222; border-right: 1px solid #444; padding: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 10; box-shadow: 2px 0 10px #000; }
+    h2 { color: #3b82f6; margin: 0 0 10px 0; font-size: 22px; }
+    label { font-size: 11px; color: #aaa; font-weight: bold; display: block; margin-bottom: 3px; }
+    input, select, button { width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: white; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px; }
+    button { font-weight: bold; cursor: pointer; text-transform: uppercase; border: none; transition: 0.2s; }
+    .btn-scan { background: #3b82f6; margin-top: 5px; }
+    .btn-scan:hover { background: #2563eb; }
+    .btn-geo { background: transparent; border: 1px solid #27ae60; color: #27ae60; margin-bottom: 15px; }
+    .btn-geo:hover { background: rgba(39, 174, 96, 0.1); }
+    .btn-csv { background: #444; }
+    .btn-csv:hover { background: #555; }
+    #results { flex: 1; overflow-y: auto; border-top: 1px solid #444; padding-top: 10px; min-height: 0; }
 
-  <!-- CSS separat -->
-  <link rel="stylesheet" href="./assets/styles.css">
+    .card { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; position: relative; transition: 0.2s; display: flex; gap: 10px; }
+    .card:hover { background: #2a2a2a; border-left: 3px solid #3b82f6; }
+    .place-img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; background: #444; }
+    .place-info { flex: 1; padding-right: 36px; }
+    .route-info { font-size: 11px; color: #27ae60; margin-top: 5px; font-weight: bold; display: none; }
+    .transit-steps { font-size: 10px; color: #ddd; margin-top: 4px; background: rgba(255,255,255,0.1); padding: 4px; border-radius: 4px; }
+    .step-badge { display: inline-block; background: #333; border: 1px solid #555; padding: 1px 4px; border-radius: 3px; margin-right: 3px; margin-bottom: 2px; }
+    .best-badge { position: absolute; top: 8px; right: 8px; background: #27ae60; font-size: 9px; padding: 2px 5px; border-radius: 3px; }
+
+    .fav-btn {
+      position: absolute;
+      right: 10px;
+      top: 38px;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: #2b2b2b;
+      border: 1px solid #555;
+      color: #f1c40f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .fav-btn:hover { background: #333; }
+
+    #sv-panel {
+      position: absolute; bottom: 30px; right: 20px;
+      width: 350px; height: 250px;
+      background: #000; border: 3px solid #fff; border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+      display: none; z-index: 99; overflow: hidden;
+    }
+    #sv-container { width: 100%; height: 100%; }
+    #sv-close {
+      position: absolute; top: 5px; right: 5px;
+      background: #e74c3c; color: white; border: none;
+      width: 25px; height: 25px; border-radius: 50%;
+      font-weight: bold; cursor: pointer; z-index: 100;
+    }
+    #sv-label {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.6); color: white;
+      font-size: 10px; padding: 5px; text-align: center; pointer-events: none; z-index: 99;
+    }
+
+    #map { flex: 1; height: 100%; }
+
+    .mini-block {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+    .mini-title {
+      font-size: 11px;
+      color: #aaa;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mini-item {
+      font-size: 11px;
+      color: #ddd;
+      padding: 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      background: rgba(255,255,255,0.03);
+      margin-bottom: 6px;
+    }
+    .mini-item:hover { background: rgba(59,130,246,0.12); }
+    .mini-muted { color: #888; font-size: 10px; }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      #sidebar { width: 100%; height: 60vh; order: 2; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); padding: 10px; z-index: 20; gap: 5px; }
+      #map { width: 100%; height: 40vh; order: 1; }
+      h2 { display: none; }
+      .btn-csv { display: none; }
+      label { display: none; }
+      input, select, button { padding: 8px; margin-bottom: 5px; font-size: 13px; }
+      .btn-geo { margin-bottom: 5px; padding: 5px; }
+      #results { height: 100%; overflow-y: auto; background: #222; border: 1px solid #333; }
+    }
+  </style>
 </head>
 <body>
 
@@ -41,8 +143,7 @@
       </div>
       <div style="flex:1">
         <label>RAZA: <span id="rVal">1500</span>m</label>
-        <input id="rad" type="range" min="500" max="10000" value="1500" step="100"
-               oninput="document.getElementById('rVal').innerText=this.value">
+        <input id="rad" type="range" min="500" max="10000" value="1500" step="100" oninput="document.getElementById('rVal').innerText=this.value">
       </div>
     </div>
 
@@ -57,9 +158,18 @@
     <button class="btn-csv" onclick="getCSV()">Exporta CSV</button>
 
     <div style="font-size:11px; color:#666; margin-top:5px">
-        Rezultate: <span id="count">0</span>
-        <span style="float:right"><a href="./admin.html" style="color:#3b82f6; text-decoration:none">Admin</a></span>
+      Rezultate: <span id="count">0</span>
+      <span style="float:right"><a href="./admin.html" style="color:#3b82f6; text-decoration:none">Admin</a></span>
     </div>
+
+    <div id="historyBox" class="mini-block" style="display:none;">
+      <div class="mini-title">
+        <span>Istoric căutări</span>
+        <span class="mini-muted" id="historyMeta"></span>
+      </div>
+      <div id="historyList"></div>
+    </div>
+
     <div id="results"></div>
   </div>
 
@@ -72,11 +182,466 @@
     </div>
   </div>
 
-  <!-- Firebase separat (module) -->
   <script type="module" src="./assets/firebase.js"></script>
 
-  <script src="./assets/app.js" defer></script>
+  <script>
+    let map, circle, service, directionsService, directionsRenderer
+    let miniStreetView
+    let markers = []
+    let exportData = []
+    let userPos = { lat: 44.4268, lng: 26.1025 }
 
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCvbL5aBjXtO-_61bYgMKj2G9o3sEtztGY&libraries=places,geometry&callback=initMap" defer></script>
+    let currentSelectedDest = null
+    let currentSelectedMsgId = null
+    let currentSelectedPlaceId = null
+
+    const LS_STATE = "atlasgo_last_state_v1"
+    const LS_HISTORY = "atlasgo_history_v1"
+    const LS_FAVS = "atlasgo_favs_v1"
+
+    function safeParseJSON(s, fallback) {
+      try { return JSON.parse(s) } catch { return fallback }
+    }
+
+    function getAuthUser() {
+      return window.__authUser || null
+    }
+
+    function requireLoginOrWarn() {
+      const u = getAuthUser()
+      if (!u) {
+        alert("Trebuie să fii autentificat ca să salvezi favoritele și istoricul.")
+        return null
+      }
+      return u
+    }
+
+    function loadState() {
+      const raw = localStorage.getItem(LS_STATE)
+      const st = safeParseJSON(raw, null)
+      if (!st) return
+      if (typeof st.city === "string") document.getElementById("city").value = st.city
+      if (typeof st.cat === "string") document.getElementById("cat").value = st.cat
+      if (typeof st.travelMode === "string") document.getElementById("travelMode").value = st.travelMode
+      if (typeof st.sort === "string") document.getElementById("sort").value = st.sort
+      if (typeof st.rad === "number") {
+        document.getElementById("rad").value = String(st.rad)
+        document.getElementById("rVal").innerText = String(st.rad)
+      }
+    }
+
+    function saveState() {
+      const st = {
+        city: document.getElementById("city").value || "",
+        cat: document.getElementById("cat").value,
+        travelMode: document.getElementById("travelMode").value,
+        sort: document.getElementById("sort").value,
+        rad: parseInt(document.getElementById("rad").value, 10)
+      }
+      localStorage.setItem(LS_STATE, JSON.stringify(st))
+    }
+
+    function readHistory() {
+      return safeParseJSON(localStorage.getItem(LS_HISTORY), [])
+    }
+
+    function writeHistory(arr) {
+      localStorage.setItem(LS_HISTORY, JSON.stringify(arr))
+    }
+
+    function addHistoryEntry(entry) {
+      const u = requireLoginOrWarn()
+      if (!u) return
+      const arr = readHistory()
+      arr.unshift(entry)
+      const trimmed = arr.slice(0, 10)
+      writeHistory(trimmed)
+      renderHistory()
+    }
+
+    function renderHistory() {
+      const arr = readHistory()
+      const box = document.getElementById("historyBox")
+      const list = document.getElementById("historyList")
+      const meta = document.getElementById("historyMeta")
+
+      if (!arr.length) {
+        box.style.display = "none"
+        return
+      }
+
+      box.style.display = "block"
+      meta.textContent = String(arr.length) + " salvate"
+      list.innerHTML = ""
+
+      arr.forEach((h) => {
+        const div = document.createElement("div")
+        div.className = "mini-item"
+        const line1 = (h.city && h.city.trim()) ? h.city : "Zona curentă"
+        const line2 = `${h.catLabel} • ${h.rad}m • ${h.modeLabel} • ${h.sortLabel}`
+        div.innerHTML = `<div style="font-weight:700">${line1}</div><div class="mini-muted">${line2}</div>`
+        div.onclick = () => {
+          document.getElementById("city").value = h.city || ""
+          document.getElementById("cat").value = h.cat
+          document.getElementById("travelMode").value = h.mode
+          document.getElementById("sort").value = h.sort
+          document.getElementById("rad").value = String(h.rad)
+          document.getElementById("rVal").innerText = String(h.rad)
+          saveState()
+          runScan()
+        }
+        list.appendChild(div)
+      })
+    }
+
+    function readFavs() {
+      return safeParseJSON(localStorage.getItem(LS_FAVS), {})
+    }
+
+    function writeFavs(obj) {
+      localStorage.setItem(LS_FAVS, JSON.stringify(obj))
+    }
+
+    function isFav(placeId) {
+      const favs = readFavs()
+      return Boolean(favs[placeId])
+    }
+
+    function toggleFav(placeObj) {
+      const u = requireLoginOrWarn()
+      if (!u) return
+
+      const placeId = placeObj.place_id
+      if (!placeId) return
+
+      const favs = readFavs()
+      if (favs[placeId]) {
+        delete favs[placeId]
+      } else {
+        favs[placeId] = {
+          place_id: placeId,
+          name: placeObj.name || "",
+          vicinity: placeObj.vicinity || "",
+          lat: placeObj.geometry && placeObj.geometry.location ? placeObj.geometry.location.lat() : null,
+          lng: placeObj.geometry && placeObj.geometry.location ? placeObj.geometry.location.lng() : null,
+          rating: placeObj.rating || 0,
+          ts: Date.now()
+        }
+      }
+      writeFavs(favs)
+
+      const btn = document.querySelector(`[data-fav-id="${placeId}"]`)
+      if (btn) btn.textContent = favs[placeId] ? "★" : "☆"
+    }
+
+    function getCategoryKeywords(raw) {
+      return raw.split("|").map(s => s.trim()).filter(Boolean)
+    }
+
+    function labelForCategoryValue(v) {
+      const sel = document.getElementById("cat")
+      const opt = sel.querySelector(`option[value="${v}"]`)
+      return opt ? (opt.textContent || v) : v
+    }
+
+    function labelForSort(v) {
+      if (v === "dist") return "Distanță"
+      if (v === "rate") return "Rating"
+      return "Best"
+    }
+
+    function labelForMode(v) {
+      if (v === "DRIVING") return "Mașină"
+      if (v === "TRANSIT") return "Transit"
+      if (v === "WALKING") return "Jos"
+      if (v === "BICYCLING") return "Bicicletă"
+      return v
+    }
+
+    function initMap() {
+      loadState()
+      renderHistory()
+
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: userPos, zoom: 13,
+        disableDefaultUI: false, streetViewControl: true, mapTypeControl: false
+      })
+
+      new google.maps.TransitLayer().setMap(map)
+
+      directionsService = new google.maps.DirectionsService()
+      directionsRenderer = new google.maps.DirectionsRenderer({
+        map: map, suppressMarkers: true,
+        polylineOptions: { strokeColor: "#3b82f6", strokeWeight: 6, strokeOpacity: 0.7 }
+      })
+
+      miniStreetView = new google.maps.StreetViewPanorama(
+        document.getElementById("sv-container"), {
+          position: userPos, pov: { heading: 34, pitch: 10 },
+          visible: true, disableDefaultUI: false, zoomControl: true, panControl: true
+        }
+      )
+
+      circle = new google.maps.Circle({
+        map, center: userPos, radius: parseInt(document.getElementById("rad").value, 10) || 1500,
+        fillColor: "#3b82f6", fillOpacity: 0.1, strokeColor: "#3b82f6", strokeWeight: 2,
+        editable: true, draggable: true
+      })
+      circle.addListener("center_changed", () => { userPos = circle.getCenter() })
+
+      service = new google.maps.places.PlacesService(map)
+
+      const ac = new google.maps.places.Autocomplete(document.getElementById("city"))
+      ac.bindTo("bounds", map)
+      ac.addListener("place_changed", () => {
+        const p = ac.getPlace()
+        if (p.geometry) {
+          userPos = p.geometry.location
+          updateMapCenter()
+        }
+      })
+
+      document.getElementById("city").addEventListener("input", saveState)
+      document.getElementById("cat").addEventListener("change", saveState)
+      document.getElementById("travelMode").addEventListener("change", saveState)
+      document.getElementById("sort").addEventListener("change", saveState)
+      document.getElementById("rad").addEventListener("input", saveState)
+    }
+
+    function locateUser() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (p) => {
+            userPos = { lat: p.coords.latitude, lng: p.coords.longitude }
+            updateMapCenter()
+          },
+          () => { alert("Eroare GPS.") }
+        )
+      } else { alert("Fara suport GPS.") }
+    }
+
+    function updateMapCenter() {
+      map.setCenter(userPos)
+      map.setZoom(15)
+      circle.setCenter(userPos)
+    }
+
+    function updateRouteMode() {
+      saveState()
+      if (currentSelectedDest && currentSelectedMsgId) {
+        calculateAndDisplayRoute(currentSelectedDest, currentSelectedMsgId, currentSelectedPlaceId)
+      }
+    }
+
+    function nearbySearchAsync(req) {
+      return new Promise((resolve) => {
+        service.nearbySearch(req, (res, status) => {
+          if (status === "OK" && res) resolve(res)
+          else resolve([])
+        })
+      })
+    }
+
+    async function runScan() {
+      const r = parseInt(document.getElementById("rad").value, 10)
+      const cRaw = document.getElementById("cat").value
+      const s = document.getElementById("sort").value
+      const mode = document.getElementById("travelMode").value
+      const cityText = document.getElementById("city").value || ""
+
+      saveState()
+
+      circle.setRadius(r)
+      directionsRenderer.setDirections({ routes: [] })
+      document.getElementById("sv-panel").style.display = "none"
+      currentSelectedDest = null
+      currentSelectedMsgId = null
+      currentSelectedPlaceId = null
+
+      const center = circle.getCenter()
+      const cats = getCategoryKeywords(cRaw)
+      const list = document.getElementById("results")
+      list.innerHTML = '<div style="padding:10px; color:#777">Caut...</div>'
+
+      const all = new Map()
+      for (const kw of cats) {
+        const req = { location: center, radius: r, keyword: kw }
+        const res = await nearbySearchAsync(req)
+        res.forEach(p => { if (p.place_id && !all.has(p.place_id)) all.set(p.place_id, p) })
+      }
+      const res = Array.from(all.values())
+
+      list.innerHTML = ""
+      markers.forEach(m => m.setMap(null))
+      markers = []
+      exportData = []
+
+      const histEntry = {
+        city: cityText,
+        cat: cRaw,
+        catLabel: labelForCategoryValue(cRaw),
+        rad: r,
+        sort: s,
+        sortLabel: labelForSort(s),
+        mode: mode,
+        modeLabel: labelForMode(mode),
+        ts: Date.now()
+      }
+      addHistoryEntry(histEntry)
+
+      if (res.length) {
+        res.forEach(p => p.realDist = google.maps.geometry.spherical.computeDistanceBetween(center, p.geometry.location))
+        const filtered = res.filter(p => p.realDist <= r)
+        document.getElementById("count").innerText = filtered.length
+
+        if (s === "dist") filtered.sort((a, b) => a.realDist - b.realDist)
+        else if (s === "rate") filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        else filtered.sort((a, b) => ((b.rating || 0) * 1000 - b.realDist) - ((a.rating || 0) * 1000 - a.realDist))
+
+        filtered.forEach((p, idx) => {
+          exportData.push(p)
+          markers.push(new google.maps.Marker({ map, position: p.geometry.location, title: p.name }))
+
+          const badge = idx === 0 ? '<div class="best-badge">BEST</div>' : ""
+          const thumbUrl = (p.photos && p.photos.length) ? p.photos[0].getUrl({ maxWidth: 100 }) : "https://via.placeholder.com/60?text=NoImg"
+          const favSymbol = (p.place_id && isFav(p.place_id)) ? "★" : "☆"
+          const safePlaceId = (p.place_id || "").replace(/'/g, "")
+
+          const card = document.createElement("div")
+          card.className = "card"
+          card.onclick = () => selectLocation(p.geometry.location.lat(), p.geometry.location.lng(), `route-msg-${idx}`, safePlaceId, p)
+
+          card.innerHTML = `
+            <img src="${thumbUrl}" class="place-img">
+            <div class="place-info">
+              ${badge}
+              <b>${p.name}</b><br>
+              <span style="color:#f1c40f">${p.rating || "-"} ★</span> |
+              <span style="color:#aaa; font-size:11px">${Math.round(p.realDist)}m</span>
+              <div id="route-msg-${idx}" class="route-info">...</div>
+              <div id="steps-${idx}" class="transit-steps"></div>
+            </div>
+            <div class="fav-btn" data-fav-id="${safePlaceId}">${favSymbol}</div>
+          `
+
+          const favBtn = card.querySelector(".fav-btn")
+          favBtn.onclick = (ev) => {
+            ev.stopPropagation()
+            toggleFav(p)
+          }
+
+          list.appendChild(card)
+        })
+      } else {
+        list.innerHTML = '<div style="padding:10px; color:#777">Niciun rezultat.</div>'
+        document.getElementById("count").innerText = "0"
+      }
+    }
+
+    function selectLocation(lat, lng, msgId, placeId, placeObj) {
+      const dest = { lat: lat, lng: lng }
+      currentSelectedDest = dest
+      currentSelectedMsgId = msgId
+      currentSelectedPlaceId = placeId
+
+      const panel = document.getElementById("sv-panel")
+      panel.style.display = "block"
+      miniStreetView.setPosition(dest)
+
+      const svService = new google.maps.StreetViewService()
+      svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
+        if (status !== "OK") panel.style.display = "none"
+      })
+
+      calculateAndDisplayRoute(dest, msgId, placeId)
+    }
+
+    function iconForMode(mode) {
+      if (mode === "TRANSIT") return "🚌"
+      if (mode === "WALKING") return "🚶"
+      if (mode === "BICYCLING") return "🚴"
+      return "🚗"
+    }
+
+    function directionsRequest(origin, dest, mode) {
+      return {
+        origin: origin,
+        destination: dest,
+        travelMode: google.maps.TravelMode[mode],
+        provideRouteAlternatives: true
+      }
+    }
+
+    function calculateAndDisplayRoute(dest, msgId, placeId) {
+      const mode = document.getElementById("travelMode").value
+
+      document.querySelectorAll(".route-info").forEach(e => e.style.display = "none")
+      document.querySelectorAll(".transit-steps").forEach(e => e.innerHTML = "")
+
+      const div = document.getElementById(msgId)
+      const stepsDiv = document.getElementById(msgId.replace("route-msg-", "steps-"))
+      div.style.display = "block"
+      div.innerText = "Calculare..."
+
+      const attempt = (tryMode, fallbackMode, fallbackText) => {
+        directionsService.route(directionsRequest(userPos, dest, tryMode), (res, status) => {
+          if (status === "OK") {
+            directionsRenderer.setDirections(res)
+            const leg = res.routes[0].legs[0]
+
+            const icon = iconForMode(tryMode)
+            let stepSummary = ""
+
+            if (tryMode === "TRANSIT") {
+              leg.steps.forEach(step => {
+                if (step.travel_mode === "TRANSIT" && step.transit) {
+                  const line = step.transit.line.short_name || step.transit.line.name
+                  const vehicle = (step.transit.line.vehicle && step.transit.line.vehicle.name) ? step.transit.line.vehicle.name : "Transit"
+                  stepSummary += `<span class="step-badge" style="background:#2980b9">${vehicle} ${line}</span> `
+                } else if (step.travel_mode === "WALKING") {
+                  stepSummary += `<span class="step-badge">🚶 ${step.duration.text}</span> `
+                }
+              })
+            }
+
+            div.innerHTML = `${icon} ${leg.duration.text} (${leg.distance.text})`
+            if (stepSummary) stepsDiv.innerHTML = "Traseu: " + stepSummary
+            else if (tryMode === "TRANSIT") stepsDiv.innerHTML = "Doar mers pe jos (prea aproape)."
+            else stepsDiv.innerHTML = fallbackText ? `<span class="mini-muted">${fallbackText}</span>` : ""
+          } else {
+            if (fallbackMode) {
+              attempt(fallbackMode, null, fallbackText)
+              return
+            }
+            div.innerText = "Nu exista ruta."
+          }
+        })
+      }
+
+      if (mode === "BICYCLING") {
+        attempt("BICYCLING", "WALKING", "Bicicletă nu are rută disponibilă aici. Am afișat mers pe jos.")
+        return
+      }
+
+      attempt(mode, null, "")
+    }
+
+    function getCSV() {
+      if (!exportData.length) return alert("Scaneaza intai o zona!")
+      let csv = "Nume,Rating,Distanta(m),Adresa\n"
+      exportData.forEach(p => {
+        const n = (p.name || "").replace(/,/g, "")
+        const a = (p.vicinity || "").replace(/,/g, "")
+        csv += `${n},${p.rating || 0},${Math.round(p.realDist || 0)},${a}\n`
+      })
+      const b = new Blob([csv], { type: "text/csv" })
+      const l = document.createElement("a")
+      l.href = URL.createObjectURL(b)
+      l.download = "analiza_piata.csv"
+      l.click()
+    }
+  </script>
+
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCvbL5aBjXtO-_61bYgMKj2G9o3sEtztGY&libraries=places,geometry&callback=initMap" async defer></script>
 </body>
 </html>
