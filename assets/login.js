@@ -1,10 +1,10 @@
-// Login/Register page logic + Firebase Auth
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
   getAuth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 import {
@@ -14,7 +14,6 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-// EXACT config-ul tău
 const firebaseConfig = {
   apiKey: "AIzaSyC7a_97XoJn58dXB2c2wdez_MkBy9X50f8",
   authDomain: "atlas-e5b69.firebaseapp.com",
@@ -29,7 +28,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// session id (same idea as before)
 function getSessionId() {
   const k = "atlasgo_session_id";
   let sid = localStorage.getItem(k);
@@ -40,7 +38,6 @@ function getSessionId() {
   return sid;
 }
 
-// track to Firestore (events)
 async function trackEvent(type, payload = {}) {
   try {
     await addDoc(collection(db, "events"), {
@@ -58,7 +55,7 @@ async function trackEvent(type, payload = {}) {
 
 const $ = (id) => document.getElementById(id);
 
-let mode = "login"; // or "register"
+let mode = "login";
 
 function setMode(m) {
   mode = m;
@@ -68,14 +65,17 @@ function setMode(m) {
 
   $("btnSubmit").textContent = mode === "login" ? "Intră în cont" : "Creează cont";
   $("pass").setAttribute("autocomplete", mode === "login" ? "current-password" : "new-password");
+
+  $("forgotLink").style.display = (mode === "login") ? "inline" : "none";
+
   $("status").textContent = mode === "login" ? "—" : "Creează un cont nou.";
+  $("status").style.color = "#9aa0a6";
 }
 
 function setStatus(msg, kind = "muted") {
   const el = $("status");
   el.textContent = msg;
 
-  // color quick mapping
   if (kind === "ok") el.style.color = "#27ae60";
   else if (kind === "bad") el.style.color = "#e74c3c";
   else el.style.color = "#9aa0a6";
@@ -101,9 +101,7 @@ async function submit() {
       await createUserWithEmailAndPassword(auth, email, pass);
       await trackEvent("signup", { email });
     }
-    // redirect handled by auth listener
   } catch (e) {
-    // simple friendly messages
     const code = (e && e.code) ? e.code : "";
     if (code.includes("auth/invalid-email")) setStatus("Email invalid.", "bad");
     else if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) setStatus("Email sau parolă greșită.", "bad");
@@ -117,13 +115,33 @@ async function submit() {
   }
 }
 
-// If already logged in -> go to index
-onAuthStateChanged(auth, (user) => {
+async function forgotPassword() {
+  const email = $("email").value.trim();
+  if (!email) {
+    setStatus("Scrie email-ul întâi.", "bad");
+    return;
+  }
+
+  setStatus("Se trimite emailul...", "muted");
+  try {
+    await sendPasswordResetEmail(auth, email);
+    await trackEvent("password_reset_request", { email });
+    setStatus("Email trimis. Verifică inbox/spam.", "ok");
+  } catch (e) {
+    const code = (e && e.code) ? e.code : "";
+    if (code.includes("auth/invalid-email")) setStatus("Email invalid.", "bad");
+    else if (code.includes("auth/user-not-found")) setStatus("Nu există cont cu acest email.", "bad");
+    else setStatus("Nu s-a putut trimite emailul. Încearcă din nou.", "bad");
+    console.warn(e);
+  }
+}
+
+onAuthStateChanged(auth, async (user) => {
   if (user) {
     setStatus("Autentificat ✅ Redirecționare...", "ok");
     setTimeout(() => {
       location.href = "./index.html";
-    }, 300);
+    }, 250);
   }
 });
 
@@ -134,6 +152,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("tabLogin").addEventListener("click", () => setMode("login"));
   $("tabRegister").addEventListener("click", () => setMode("register"));
   $("btnSubmit").addEventListener("click", submit);
+
+  $("forgotLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    forgotPassword();
+  });
 
   $("pass").addEventListener("keydown", (e) => {
     if (e.key === "Enter") submit();
