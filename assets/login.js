@@ -68,8 +68,7 @@ function setMode(m) {
 
   $("forgotLink").style.display = (mode === "login") ? "inline" : "none";
 
-  $("status").textContent = mode === "login" ? "—" : "Creează un cont nou.";
-  $("status").style.color = "#9aa0a6";
+  setStatus(mode === "login" ? "—" : "Creează un cont nou.", "muted");
 }
 
 function setStatus(msg, kind = "muted") {
@@ -82,8 +81,7 @@ function setStatus(msg, kind = "muted") {
 }
 
 function friendlyAuthError(e) {
-  const code = (e && e.code) ? String(e.code) : "";
-  const msg = (e && e.message) ? String(e.message) : "";
+  const code = (e && e.code) ? String(e.code) : "unknown";
 
   if (code.includes("auth/unauthorized-domain")) {
     return "Domeniu neautorizat în Firebase (Authorized domains).";
@@ -110,8 +108,7 @@ function friendlyAuthError(e) {
     return "Nu există cont cu acest email.";
   }
 
-  // fallback: arată și codul, ca să știm exact ce e
-  return `Eroare la autentificare. (${code || "unknown"})`;
+  return `Eroare la autentificare. (${code})`;
 }
 
 async function submit() {
@@ -144,23 +141,44 @@ async function submit() {
 
 async function forgotPassword() {
   const email = $("email").value.trim();
+
   if (!email) {
     setStatus("Scrie email-ul întâi.", "bad");
     return;
   }
 
-  setStatus("Se trimite emailul...", "muted");
+  $("btnSubmit").disabled = true;
+  setStatus("Se trimit instrucțiunile...", "muted");
+
   try {
-    await sendPasswordResetEmail(auth, email);
+    const continueUrl = new URL("./login.html", window.location.href).toString();
+
+    await sendPasswordResetEmail(auth, email, {
+      url: continueUrl
+    });
+
     await trackEvent("password_reset_request", { email });
-    setStatus("Email trimis. Verifică inbox/spam.", "ok");
+
+    setStatus("Instrucțiunile pentru resetarea parolei au fost trimise către email. Verifică și Spam.", "ok");
   } catch (e) {
     console.warn("RESET ERROR:", e);
-    setStatus(friendlyAuthError(e), "bad");
+
+    const code = (e && e.code) ? String(e.code) : "";
+    if (code.includes("auth/unauthorized-domain")) {
+      setStatus("Resetarea nu poate trimite email: domeniu neautorizat în Firebase (Authorized domains).", "bad");
+    } else if (code.includes("auth/operation-not-allowed")) {
+      setStatus("Resetarea nu merge: Email/Password nu este activat în Firebase Authentication.", "bad");
+    } else if (code.includes("auth/invalid-email")) {
+      setStatus("Email invalid.", "bad");
+    } else {
+      setStatus("Dacă există un cont cu acest email, instrucțiunile pentru resetarea parolei au fost trimise. Verifică inbox/spam.", "ok");
+    }
+  } finally {
+    $("btnSubmit").disabled = false;
   }
 }
 
-onAuthStateChanged(auth, async (user) => {
+onAuthStateChanged(auth, (user) => {
   if (user) {
     setStatus("Autentificat ✅ Redirecționare...", "ok");
     setTimeout(() => {
