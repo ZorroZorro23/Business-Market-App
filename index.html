@@ -15,8 +15,6 @@
     .btn-scan:hover { background: #2563eb; }
     .btn-geo { background: transparent; border: 1px solid #27ae60; color: #27ae60; margin-bottom: 15px; }
     .btn-geo:hover { background: rgba(39, 174, 96, 0.1); }
-    .btn-csv { background: #444; }
-    .btn-csv:hover { background: #555; }
     #results { flex: 1; overflow-y: auto; border-top: 1px solid #444; padding-top: 10px; min-height: 0; }
 
     .card { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; position: relative; transition: 0.2s; display: flex; gap: 10px; }
@@ -123,7 +121,6 @@
       #sidebar { width: 100%; height: 60vh; order: 2; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); padding: 10px; z-index: 20; gap: 5px; }
       #map { width: 100%; height: 40vh; order: 1; }
       h2 { display: none; }
-      .btn-csv { display: none; }
       label { display: none; }
       input, select, button { padding: 8px; margin-bottom: 5px; font-size: 13px; }
       .btn-geo { margin-bottom: 5px; padding: 5px; }
@@ -180,7 +177,6 @@
     </select>
 
     <button class="btn-scan" onclick="runScan()">Scaneaza Zona</button>
-    <button class="btn-csv" onclick="getCSV()">Exporta CSV</button>
 
     <div style="font-size:11px; color:#666; margin-top:5px">
       Rezultate: <span id="count">0</span>
@@ -212,12 +208,10 @@
     let map, circle, service, directionsService, directionsRenderer
     let miniStreetView
     let markers = []
-    let exportData = []
     let userPos = { lat: 44.4268, lng: 26.1025 }
 
     let currentSelectedDest = null
     let currentSelectedMsgId = null
-    let currentSelectedPlaceId = null
 
     const LS_STATE = "atlasgo_last_state_v1"
     const LS_HISTORY = "atlasgo_history_v1"
@@ -501,7 +495,6 @@
       document.getElementById("sv-panel").style.display = "none"
       currentSelectedDest = null
       currentSelectedMsgId = null
-      currentSelectedPlaceId = null
 
       const center = circle.getCenter()
       const cats = getCategoryKeywords(cRaw)
@@ -541,10 +534,9 @@
 
         if (s === "dist") filtered.sort((a, b) => a.realDist - b.realDist)
         else if (s === "rate") filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0))
-        else filtered.sort((a, b) => ((b.rating || 0) * 1000 - b.realDist) - ((a.rating || 0) * 1000 - a.realDist))
+        else filtered.sort((a, b) => ((b.rating || 0) * 1000 - a.realDist) - ((a.rating || 0) * 1000 - b.realDist))
 
         filtered.forEach((p, idx) => {
-          exportData.push(p)
           markers.push(new google.maps.Marker({ map, position: p.geometry.location, title: p.name }))
 
           const badge = idx === 0 ? '<div class="best-badge">BEST</div>' : ""
@@ -587,7 +579,6 @@
       const dest = { lat: lat, lng: lng }
       currentSelectedDest = dest
       currentSelectedMsgId = msgId
-      currentSelectedPlaceId = placeId
 
       const panel = document.getElementById("sv-panel")
       panel.style.display = "block"
@@ -668,21 +659,6 @@
       }
 
       attempt(mode, null, "")
-    }
-
-    function getCSV() {
-      if (!exportData.length) return alert("Scaneaza intai o zona!")
-      let csv = "Nume,Rating,Distanta(m),Adresa\n"
-      exportData.forEach(p => {
-        const n = (p.name || "").replace(/,/g, "")
-        const a = (p.vicinity || "").replace(/,/g, "")
-        csv += `${n},${p.rating || 0},${Math.round(p.realDist || 0)},${a}\n`
-      })
-      const b = new Blob([csv], { type: "text/csv" })
-      const l = document.createElement("a")
-      l.href = URL.createObjectURL(b)
-      l.download = "analiza_piata.csv"
-      l.click()
     }
 
     setTimeout(() => {
