@@ -97,6 +97,28 @@
     .mini-item:hover { background: rgba(59,130,246,0.12); }
     .mini-muted { color: #888; font-size: 10px; }
 
+    .topbar {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom: 6px;
+    }
+    .auth-btn {
+      width:auto;
+      padding: 6px 10px;
+      font-size: 11px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid #3b82f6;
+      color: #3b82f6;
+      margin-bottom: 0;
+      text-transform: none;
+    }
+    .auth-btn:hover {
+      background: rgba(59,130,246,0.12);
+    }
+
     @media (max-width: 768px) {
       body { flex-direction: column; }
       #sidebar { width: 100%; height: 60vh; order: 2; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); padding: 10px; z-index: 20; gap: 5px; }
@@ -107,13 +129,17 @@
       input, select, button { padding: 8px; margin-bottom: 5px; font-size: 13px; }
       .btn-geo { margin-bottom: 5px; padding: 5px; }
       #results { height: 100%; overflow-y: auto; background: #222; border: 1px solid #333; }
+      .topbar { margin-bottom: 0; }
     }
   </style>
 </head>
 <body>
 
   <div id="sidebar">
-    <h2>AtlasGo <span style="font-size:12px; color:#888">v4.0 Student</span></h2>
+    <div class="topbar">
+      <h2 style="margin:0;">AtlasGo <span style="font-size:12px; color:#888">v4.0 Student</span></h2>
+      <button id="authBtn" class="auth-btn" type="button">Login</button>
+    </div>
 
     <button class="btn-geo" onclick="locateUser()">📍 Localizează-mă (GPS)</button>
 
@@ -206,6 +232,23 @@
     function getAuthUser() {
       return window.__authUser || null
     }
+
+    function updateAuthButton() {
+      const btn = document.getElementById("authBtn")
+      const u = getAuthUser()
+      if (u) {
+        btn.textContent = "Logout"
+        btn.onclick = () => {
+          if (window.logout) window.logout()
+          else location.href = "./login.html"
+        }
+      } else {
+        btn.textContent = "Login"
+        btn.onclick = () => { location.href = "./login.html" }
+      }
+    }
+
+    window.addEventListener("auth-changed", updateAuthButton)
 
     function requireLoginOrWarn() {
       const u = getAuthUser()
@@ -361,6 +404,7 @@
     function initMap() {
       loadState()
       renderHistory()
+      updateAuthButton()
 
       map = new google.maps.Map(document.getElementById("map"), {
         center: userPos, zoom: 13,
@@ -429,7 +473,7 @@
     function updateRouteMode() {
       saveState()
       if (currentSelectedDest && currentSelectedMsgId) {
-        calculateAndDisplayRoute(currentSelectedDest, currentSelectedMsgId, currentSelectedPlaceId)
+        calculateAndDisplayRoute(currentSelectedDest, currentSelectedMsgId)
       }
     }
 
@@ -553,7 +597,7 @@
         if (status !== "OK") panel.style.display = "none"
       })
 
-      calculateAndDisplayRoute(dest, msgId, placeId)
+      calculateAndDisplayRoute(dest, msgId)
     }
 
     function iconForMode(mode) {
@@ -572,7 +616,7 @@
       }
     }
 
-    function calculateAndDisplayRoute(dest, msgId, placeId) {
+    function calculateAndDisplayRoute(dest, msgId) {
       const mode = document.getElementById("travelMode").value
 
       document.querySelectorAll(".route-info").forEach(e => e.style.display = "none")
@@ -583,16 +627,17 @@
       div.style.display = "block"
       div.innerText = "Calculare..."
 
-      const attempt = (tryMode, fallbackMode, fallbackText) => {
+      const attempt = (tryMode, fallbackMode, note) => {
         directionsService.route(directionsRequest(userPos, dest, tryMode), (res, status) => {
           if (status === "OK") {
             directionsRenderer.setDirections(res)
             const leg = res.routes[0].legs[0]
 
             const icon = iconForMode(tryMode)
-            let stepSummary = ""
+            div.innerHTML = `${icon} ${leg.duration.text} (${leg.distance.text})`
 
             if (tryMode === "TRANSIT") {
+              let stepSummary = ""
               leg.steps.forEach(step => {
                 if (step.travel_mode === "TRANSIT" && step.transit) {
                   const line = step.transit.line.short_name || step.transit.line.name
@@ -602,15 +647,13 @@
                   stepSummary += `<span class="step-badge">🚶 ${step.duration.text}</span> `
                 }
               })
+              stepsDiv.innerHTML = stepSummary ? ("Traseu: " + stepSummary) : "Doar mers pe jos (prea aproape)."
+            } else {
+              stepsDiv.innerHTML = note ? `<span class="mini-muted">${note}</span>` : ""
             }
-
-            div.innerHTML = `${icon} ${leg.duration.text} (${leg.distance.text})`
-            if (stepSummary) stepsDiv.innerHTML = "Traseu: " + stepSummary
-            else if (tryMode === "TRANSIT") stepsDiv.innerHTML = "Doar mers pe jos (prea aproape)."
-            else stepsDiv.innerHTML = fallbackText ? `<span class="mini-muted">${fallbackText}</span>` : ""
           } else {
             if (fallbackMode) {
-              attempt(fallbackMode, null, fallbackText)
+              attempt(fallbackMode, null, note)
               return
             }
             div.innerText = "Nu exista ruta."
