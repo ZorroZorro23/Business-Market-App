@@ -81,6 +81,39 @@ function setStatus(msg, kind = "muted") {
   else el.style.color = "#9aa0a6";
 }
 
+function friendlyAuthError(e) {
+  const code = (e && e.code) ? String(e.code) : "";
+  const msg = (e && e.message) ? String(e.message) : "";
+
+  if (code.includes("auth/unauthorized-domain")) {
+    return "Domeniu neautorizat în Firebase (Authorized domains).";
+  }
+  if (code.includes("auth/operation-not-allowed")) {
+    return "Email/Password nu este activat în Firebase Authentication.";
+  }
+  if (code.includes("auth/network-request-failed")) {
+    return "Eroare de rețea (internet/adblock). Încearcă din nou.";
+  }
+  if (code.includes("auth/invalid-email")) {
+    return "Email invalid.";
+  }
+  if (code.includes("auth/email-already-in-use")) {
+    return "Email deja înregistrat. Folosește Login.";
+  }
+  if (code.includes("auth/weak-password")) {
+    return "Parolă prea slabă (minim 6 caractere).";
+  }
+  if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) {
+    return "Email sau parolă greșită.";
+  }
+  if (code.includes("auth/user-not-found")) {
+    return "Nu există cont cu acest email.";
+  }
+
+  // fallback: arată și codul, ca să știm exact ce e
+  return `Eroare la autentificare. (${code || "unknown"})`;
+}
+
 async function submit() {
   const email = $("email").value.trim();
   const pass = $("pass").value;
@@ -102,14 +135,8 @@ async function submit() {
       await trackEvent("signup", { email });
     }
   } catch (e) {
-    const code = (e && e.code) ? e.code : "";
-    if (code.includes("auth/invalid-email")) setStatus("Email invalid.", "bad");
-    else if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) setStatus("Email sau parolă greșită.", "bad");
-    else if (code.includes("auth/email-already-in-use")) setStatus("Email deja folosit. Încearcă Login.", "bad");
-    else if (code.includes("auth/weak-password")) setStatus("Parolă prea slabă (minim 6 caractere).", "bad");
-    else setStatus("Eroare la autentificare. Încearcă din nou.", "bad");
-
-    console.warn(e);
+    console.warn("AUTH ERROR:", e);
+    setStatus(friendlyAuthError(e), "bad");
   } finally {
     $("btnSubmit").disabled = false;
   }
@@ -128,11 +155,8 @@ async function forgotPassword() {
     await trackEvent("password_reset_request", { email });
     setStatus("Email trimis. Verifică inbox/spam.", "ok");
   } catch (e) {
-    const code = (e && e.code) ? e.code : "";
-    if (code.includes("auth/invalid-email")) setStatus("Email invalid.", "bad");
-    else if (code.includes("auth/user-not-found")) setStatus("Nu există cont cu acest email.", "bad");
-    else setStatus("Nu s-a putut trimite emailul. Încearcă din nou.", "bad");
-    console.warn(e);
+    console.warn("RESET ERROR:", e);
+    setStatus(friendlyAuthError(e), "bad");
   }
 }
 
