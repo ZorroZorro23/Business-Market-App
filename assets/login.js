@@ -4,7 +4,9 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 import {
@@ -54,22 +56,7 @@ async function trackEvent(type, payload = {}) {
 }
 
 const $ = (id) => document.getElementById(id);
-
 let mode = "login";
-
-function setMode(m) {
-  mode = m;
-
-  $("tabLogin").classList.toggle("active", mode === "login");
-  $("tabRegister").classList.toggle("active", mode === "register");
-
-  $("btnSubmit").textContent = mode === "login" ? "Intră în cont" : "Creează cont";
-  $("pass").setAttribute("autocomplete", mode === "login" ? "current-password" : "new-password");
-
-  $("forgotLink").style.display = (mode === "login") ? "inline" : "none";
-
-  setStatus(mode === "login" ? "—" : "Creează un cont nou.", "muted");
-}
 
 function setStatus(msg, kind = "muted") {
   const el = $("status");
@@ -80,38 +67,45 @@ function setStatus(msg, kind = "muted") {
   else el.style.color = "#9aa0a6";
 }
 
-function friendlyAuthError(e) {
-  const code = (e && e.code) ? String(e.code) : "unknown";
+function setMode(m) {
+  mode = m;
 
-  if (code.includes("auth/unauthorized-domain")) {
-    return "Domeniu neautorizat în Firebase (Authorized domains).";
-  }
-  if (code.includes("auth/operation-not-allowed")) {
-    return "Email/Password nu este activat în Firebase Authentication.";
-  }
-  if (code.includes("auth/network-request-failed")) {
-    return "Eroare de rețea (internet/adblock). Încearcă din nou.";
-  }
-  if (code.includes("auth/invalid-email")) {
-    return "Email invalid.";
-  }
-  if (code.includes("auth/email-already-in-use")) {
-    return "Email deja înregistrat. Folosește Login.";
-  }
-  if (code.includes("auth/weak-password")) {
-    return "Parolă prea slabă (minim 6 caractere).";
-  }
-  if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) {
-    return "Email sau parolă greșită.";
-  }
-  if (code.includes("auth/user-not-found")) {
-    return "Nu există cont cu acest email.";
-  }
+  $("tabLogin").classList.toggle("active", mode === "login");
+  $("tabRegister").classList.toggle("active", mode === "register");
 
-  return `Eroare la autentificare. (${code})`;
+  $("btnSubmit").textContent = mode === "login" ? "Intră în cont" : "Creează cont";
+  $("pass").setAttribute("autocomplete", mode === "login" ? "current-password" : "new-password");
+  $("forgotLink").style.display = (mode === "login") ? "inline" : "none";
+
+  setStatus(mode === "login" ? "—" : "Creează un cont nou.", "muted");
 }
 
-async function submit() {
+function mapAuthError(e) {
+  const code = (e && e.code) ? String(e.code) : "unknown";
+
+  if (code === "auth/unauthorized-domain") return "Domeniu neautorizat în Firebase (Authorized domains).";
+  if (code === "auth/operation-not-allowed") return "Providerul nu este activat în Firebase Authentication.";
+  if (code === "auth/network-request-failed") return "Eroare de rețea sau extensie (adblock). Încearcă alt browser/incognito.";
+  if (code === "auth/popup-blocked") return "Popup blocat de browser. Permite popup și încearcă din nou.";
+  if (code === "auth/popup-closed-by-user") return "Ai închis fereastra Google. Încearcă din nou.";
+  if (code === "auth/cancelled-popup-request") return "Cerere anulată. Încearcă din nou.";
+  if (code === "auth/invalid-email") return "Email invalid.";
+  if (code === "auth/email-already-in-use") return "Email deja înregistrat. Folosește Login.";
+  if (code === "auth/weak-password") return "Parolă prea slabă (minim 6 caractere).";
+  if (code === "auth/invalid-credential" || code === "auth/wrong-password") return "Email sau parolă greșită.";
+  if (code === "auth/user-not-found") return "Nu există cont cu acest email.";
+
+  return `Eroare. (${code})`;
+}
+
+function lockUI(isLocked) {
+  $("btnSubmit").disabled = isLocked;
+  $("btnGoogle").disabled = isLocked;
+  $("tabLogin").disabled = isLocked;
+  $("tabRegister").disabled = isLocked;
+}
+
+async function submitEmailPassword() {
   const email = $("email").value.trim();
   const pass = $("pass").value;
 
@@ -120,70 +114,73 @@ async function submit() {
     return;
   }
 
-  $("btnSubmit").disabled = true;
+  lockUI(true);
   setStatus("Se procesează...", "muted");
 
   try {
     if (mode === "login") {
       await signInWithEmailAndPassword(auth, email, pass);
-      await trackEvent("login", { email });
+      await trackEvent("login_email", { email });
     } else {
       await createUserWithEmailAndPassword(auth, email, pass);
-      await trackEvent("signup", { email });
+      await trackEvent("signup_email", { email });
     }
   } catch (e) {
     console.warn("AUTH ERROR:", e);
-    setStatus(friendlyAuthError(e), "bad");
+    setStatus(mapAuthError(e), "bad");
   } finally {
-    $("btnSubmit").disabled = false;
+    lockUI(false);
   }
 }
 
 async function forgotPassword() {
   const email = $("email").value.trim();
-
   if (!email) {
     setStatus("Scrie email-ul întâi.", "bad");
     return;
   }
 
-  $("btnSubmit").disabled = true;
+  lockUI(true);
   setStatus("Se trimit instrucțiunile...", "muted");
 
   try {
     const continueUrl = new URL("./login.html", window.location.href).toString();
+    const actionCodeSettings = { url: continueUrl, handleCodeInApp: false };
 
-    await sendPasswordResetEmail(auth, email, {
-      url: continueUrl
-    });
-
+    await sendPasswordResetEmail(auth, email, actionCodeSettings);
     await trackEvent("password_reset_request", { email });
 
     setStatus("Instrucțiunile pentru resetarea parolei au fost trimise către email. Verifică și Spam.", "ok");
   } catch (e) {
     console.warn("RESET ERROR:", e);
-
-    const code = (e && e.code) ? String(e.code) : "";
-    if (code.includes("auth/unauthorized-domain")) {
-      setStatus("Resetarea nu poate trimite email: domeniu neautorizat în Firebase (Authorized domains).", "bad");
-    } else if (code.includes("auth/operation-not-allowed")) {
-      setStatus("Resetarea nu merge: Email/Password nu este activat în Firebase Authentication.", "bad");
-    } else if (code.includes("auth/invalid-email")) {
-      setStatus("Email invalid.", "bad");
-    } else {
-      setStatus("Dacă există un cont cu acest email, instrucțiunile pentru resetarea parolei au fost trimise. Verifică inbox/spam.", "ok");
-    }
+    setStatus(mapAuthError(e), "bad");
   } finally {
-    $("btnSubmit").disabled = false;
+    lockUI(false);
+  }
+}
+
+async function signInWithGoogle() {
+  lockUI(true);
+  setStatus("Se deschide Google...", "muted");
+
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
+    const cred = await signInWithPopup(auth, provider);
+    await trackEvent("login_google", { email: cred.user?.email || "" });
+  } catch (e) {
+    console.warn("GOOGLE AUTH ERROR:", e);
+    setStatus(mapAuthError(e), "bad");
+  } finally {
+    lockUI(false);
   }
 }
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
-    setStatus("Autentificat ✅ Redirecționare...", "ok");
-    setTimeout(() => {
-      location.href = "./index.html";
-    }, 250);
+    setStatus("Autentificat. Redirecționare...", "ok");
+    setTimeout(() => { location.href = "./index.html"; }, 250);
   }
 });
 
@@ -193,7 +190,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $("tabLogin").addEventListener("click", () => setMode("login"));
   $("tabRegister").addEventListener("click", () => setMode("register"));
-  $("btnSubmit").addEventListener("click", submit);
+
+  $("btnSubmit").addEventListener("click", submitEmailPassword);
+  $("btnGoogle").addEventListener("click", signInWithGoogle);
 
   $("forgotLink").addEventListener("click", (e) => {
     e.preventDefault();
@@ -201,9 +200,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   $("pass").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") submit();
+    if (e.key === "Enter") submitEmailPassword();
   });
+
   $("email").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") submit();
+    if (e.key === "Enter") submitEmailPassword();
   });
 });
