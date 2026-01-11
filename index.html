@@ -352,12 +352,17 @@
       try { return JSON.parse(s) } catch { return fallback }
     }
 
+    function byId(id) {
+      return document.getElementById(id)
+    }
+
     function getAuthUser() {
       return window.__authUser || null
     }
 
     function updateAuthButton() {
-      const btn = document.getElementById("authBtn")
+      const btn = byId("authBtn")
+      if (!btn) return
       const u = getAuthUser()
       if (u) {
         btn.textContent = "Logout"
@@ -386,33 +391,46 @@
       const raw = localStorage.getItem(LS_STATE)
       const st = safeParseJSON(raw, null)
       if (!st) return
-      if (typeof st.city === "string") document.getElementById("city").value = st.city
-      if (typeof st.cat === "string") document.getElementById("cat").value = st.cat
-      if (typeof st.travelMode === "string") document.getElementById("travelMode").value = st.travelMode
-      if (typeof st.sort === "string") document.getElementById("sort").value = st.sort
-      if (typeof st.rad === "number") {
-        document.getElementById("rad").value = String(st.rad)
-        document.getElementById("rVal").innerText = String(st.rad)
-      }
+      const city = byId("city")
+      const cat = byId("cat")
+      const mode = byId("travelMode")
+      const sort = byId("sort")
+      const rad = byId("rad")
+      const rVal = byId("rVal")
+
+      if (city && typeof st.city === "string") city.value = st.city
+      if (cat && typeof st.cat === "string") cat.value = st.cat
+      if (mode && typeof st.travelMode === "string") mode.value = st.travelMode
+      if (sort && typeof st.sort === "string") sort.value = st.sort
+      if (rad && typeof st.rad === "number") rad.value = String(st.rad)
+      if (rVal && typeof st.rad === "number") rVal.innerText = String(st.rad)
     }
 
     function saveState() {
+      const city = byId("city")
+      const cat = byId("cat")
+      const mode = byId("travelMode")
+      const sort = byId("sort")
+      const rad = byId("rad")
+
       const st = {
-        city: document.getElementById("city").value || "",
-        cat: document.getElementById("cat").value,
-        travelMode: document.getElementById("travelMode").value,
-        sort: document.getElementById("sort").value,
-        rad: parseInt(document.getElementById("rad").value, 10)
+        city: city ? (city.value || "") : "",
+        cat: cat ? cat.value : "convenience_store",
+        travelMode: mode ? mode.value : "TRANSIT",
+        sort: sort ? sort.value : "dist",
+        rad: rad ? parseInt(rad.value, 10) : 1500
       }
       localStorage.setItem(LS_STATE, JSON.stringify(st))
     }
 
     function readHistory() {
-      return safeParseJSON(localStorage.getItem(LS_HISTORY), [])
+      const h = safeParseJSON(localStorage.getItem(LS_HISTORY), [])
+      return Array.isArray(h) ? h : []
     }
 
     function writeHistory(arr) {
-      localStorage.setItem(LS_HISTORY, JSON.stringify(arr))
+      const safeArr = Array.isArray(arr) ? arr : []
+      localStorage.setItem(LS_HISTORY, JSON.stringify(safeArr))
     }
 
     function addHistoryEntry(entry) {
@@ -425,11 +443,12 @@
     }
 
     function renderHistory() {
-      const arr = readHistory()
-      const box = document.getElementById("historyBox")
-      const list = document.getElementById("historyList")
-      const meta = document.getElementById("historyMeta")
+      const box = byId("historyBox")
+      const list = byId("historyList")
+      const meta = byId("historyMeta")
+      if (!box || !list || !meta) return
 
+      const arr = readHistory()
       if (!arr.length) {
         box.style.display = "none"
         return
@@ -442,16 +461,23 @@
       arr.forEach((h) => {
         const div = document.createElement("div")
         div.className = "mini-item"
-        const line1 = (h.city && h.city.trim()) ? h.city : "Zona curentă"
+        const line1 = (h.city && String(h.city).trim()) ? h.city : "Zona curentă"
         const line2 = `${h.catLabel} • ${h.rad}m • ${h.modeLabel} • ${h.sortLabel}`
         div.innerHTML = `<div style="font-weight:700">${line1}</div><div class="mini-muted">${line2}</div>`
         div.onclick = () => {
-          document.getElementById("city").value = h.city || ""
-          document.getElementById("cat").value = h.cat
-          document.getElementById("travelMode").value = h.mode
-          document.getElementById("sort").value = h.sort
-          document.getElementById("rad").value = String(h.rad)
-          document.getElementById("rVal").innerText = String(h.rad)
+          const city = byId("city")
+          const cat = byId("cat")
+          const mode = byId("travelMode")
+          const sort = byId("sort")
+          const rad = byId("rad")
+          const rVal = byId("rVal")
+
+          if (city) city.value = h.city || ""
+          if (cat) cat.value = h.cat
+          if (mode) mode.value = h.mode
+          if (sort) sort.value = h.sort
+          if (rad) rad.value = String(h.rad)
+          if (rVal) rVal.innerText = String(h.rad)
           saveState()
           runScan()
         }
@@ -460,11 +486,13 @@
     }
 
     function readFavs() {
-      return safeParseJSON(localStorage.getItem(LS_FAVS), {})
+      const f = safeParseJSON(localStorage.getItem(LS_FAVS), {})
+      return f && typeof f === "object" ? f : {}
     }
 
     function writeFavs(obj) {
-      localStorage.setItem(LS_FAVS, JSON.stringify(obj))
+      const safeObj = obj && typeof obj === "object" ? obj : {}
+      localStorage.setItem(LS_FAVS, JSON.stringify(safeObj))
     }
 
     function isFav(placeId) {
@@ -475,7 +503,6 @@
     function toggleFav(placeObj) {
       const u = requireLoginOrWarn()
       if (!u) return
-
       const placeId = placeObj.place_id
       if (!placeId) return
 
@@ -500,11 +527,12 @@
     }
 
     function getCategoryKeywords(raw) {
-      return raw.split("|").map(s => s.trim()).filter(Boolean)
+      return String(raw).split("|").map(s => s.trim()).filter(Boolean)
     }
 
     function labelForCategoryValue(v) {
-      const sel = document.getElementById("cat")
+      const sel = byId("cat")
+      if (!sel) return v
       const opt = sel.querySelector(`option[value="${v}"]`)
       return opt ? (opt.textContent || v) : v
     }
@@ -524,11 +552,15 @@
     }
 
     function initMap() {
-      loadState()
-      renderHistory()
-      updateAuthButton()
+      try {
+        loadState()
+        renderHistory()
+        updateAuthButton()
+      } catch (e) {
+        updateAuthButton()
+      }
 
-      map = new google.maps.Map(document.getElementById("map"), {
+      map = new google.maps.Map(byId("map"), {
         center: userPos,
         zoom: 13,
         disableDefaultUI: false,
@@ -546,7 +578,7 @@
       })
 
       miniStreetView = new google.maps.StreetViewPanorama(
-        document.getElementById("sv-container"),
+        byId("sv-container"),
         {
           position: userPos,
           pov: { heading: 34, pitch: 10 },
@@ -557,10 +589,13 @@
         }
       )
 
+      const rad = byId("rad")
+      const radius = rad ? parseInt(rad.value, 10) : 1500
+
       circle = new google.maps.Circle({
         map: map,
         center: userPos,
-        radius: parseInt(document.getElementById("rad").value, 10) || 1500,
+        radius: radius || 1500,
         fillColor: "#3b82f6",
         fillOpacity: 0.1,
         strokeColor: "#3b82f6",
@@ -573,21 +608,27 @@
 
       service = new google.maps.places.PlacesService(map)
 
-      const ac = new google.maps.places.Autocomplete(document.getElementById("city"))
-      ac.bindTo("bounds", map)
-      ac.addListener("place_changed", () => {
-        const p = ac.getPlace()
-        if (p.geometry) {
-          userPos = p.geometry.location
-          updateMapCenter()
-        }
-      })
+      const cityInput = byId("city")
+      if (cityInput) {
+        const ac = new google.maps.places.Autocomplete(cityInput)
+        ac.bindTo("bounds", map)
+        ac.addListener("place_changed", () => {
+          const p = ac.getPlace()
+          if (p.geometry) {
+            userPos = p.geometry.location
+            updateMapCenter()
+          }
+        })
+        cityInput.addEventListener("input", saveState)
+      }
 
-      document.getElementById("city").addEventListener("input", saveState)
-      document.getElementById("cat").addEventListener("change", saveState)
-      document.getElementById("travelMode").addEventListener("change", saveState)
-      document.getElementById("sort").addEventListener("change", saveState)
-      document.getElementById("rad").addEventListener("input", saveState)
+      const cat = byId("cat")
+      const mode = byId("travelMode")
+      const sort = byId("sort")
+      if (cat) cat.addEventListener("change", saveState)
+      if (mode) mode.addEventListener("change", saveState)
+      if (sort) sort.addEventListener("change", saveState)
+      if (rad) rad.addEventListener("input", saveState)
     }
 
     window.initMap = initMap
@@ -630,24 +671,31 @@
     }
 
     async function runScan() {
-      const r = parseInt(document.getElementById("rad").value, 10)
-      const cRaw = document.getElementById("cat").value
-      const s = document.getElementById("sort").value
-      const mode = document.getElementById("travelMode").value
-      const cityText = document.getElementById("city").value || ""
+      const rad = byId("rad")
+      const cat = byId("cat")
+      const sort = byId("sort")
+      const modeSel = byId("travelMode")
+      const city = byId("city")
+
+      const r = rad ? parseInt(rad.value, 10) : 1500
+      const cRaw = cat ? cat.value : "convenience_store"
+      const s = sort ? sort.value : "dist"
+      const mode = modeSel ? modeSel.value : "TRANSIT"
+      const cityText = city ? (city.value || "") : ""
 
       saveState()
 
-      circle.setRadius(r)
-      directionsRenderer.setDirections({ routes: [] })
-      document.getElementById("sv-panel").style.display = "none"
+      if (circle) circle.setRadius(r)
+      if (directionsRenderer) directionsRenderer.setDirections({ routes: [] })
+      const svPanel = byId("sv-panel")
+      if (svPanel) svPanel.style.display = "none"
       currentSelectedDest = null
       currentSelectedMsgId = null
 
-      const center = circle.getCenter()
+      const center = circle ? circle.getCenter() : new google.maps.LatLng(userPos.lat, userPos.lng)
       const cats = getCategoryKeywords(cRaw)
-      const list = document.getElementById("results")
-      list.innerHTML = '<div style="padding:10px; color:#777">Caut...</div>'
+      const list = byId("results")
+      if (list) list.innerHTML = '<div style="padding:10px; color:#777">Caut...</div>'
 
       const all = new Map()
       for (const kw of cats) {
@@ -658,7 +706,7 @@
 
       const res = Array.from(all.values())
 
-      list.innerHTML = ""
+      if (list) list.innerHTML = ""
       markers.forEach(m => m.setMap(null))
       markers = []
 
@@ -675,10 +723,12 @@
       }
       addHistoryEntry(histEntry)
 
+      const countEl = byId("count")
+
       if (res.length) {
         res.forEach(p => p.realDist = google.maps.geometry.spherical.computeDistanceBetween(center, p.geometry.location))
         const filtered = res.filter(p => p.realDist <= r)
-        document.getElementById("count").innerText = filtered.length
+        if (countEl) countEl.innerText = String(filtered.length)
 
         if (s === "dist") filtered.sort((a, b) => a.realDist - b.realDist)
         else if (s === "rate") filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0))
@@ -715,11 +765,11 @@
             toggleFav(p)
           }
 
-          list.appendChild(card)
+          if (list) list.appendChild(card)
         })
       } else {
-        list.innerHTML = '<div style="padding:10px; color:#777">Niciun rezultat.</div>'
-        document.getElementById("count").innerText = "0"
+        if (list) list.innerHTML = '<div style="padding:10px; color:#777">Niciun rezultat.</div>'
+        if (countEl) countEl.innerText = "0"
       }
     }
 
@@ -728,13 +778,13 @@
       currentSelectedDest = dest
       currentSelectedMsgId = msgId
 
-      const panel = document.getElementById("sv-panel")
-      panel.style.display = "block"
-      miniStreetView.setPosition(dest)
+      const panel = byId("sv-panel")
+      if (panel) panel.style.display = "block"
+      if (miniStreetView) miniStreetView.setPosition(dest)
 
       const svService = new google.maps.StreetViewService()
       svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
-        if (status !== "OK") panel.style.display = "none"
+        if (status !== "OK" && panel) panel.style.display = "none"
       })
 
       calculateAndDisplayRoute(dest, msgId)
@@ -757,13 +807,15 @@
     }
 
     function calculateAndDisplayRoute(dest, msgId) {
-      const mode = document.getElementById("travelMode").value
+      const modeSel = byId("travelMode")
+      const mode = modeSel ? modeSel.value : "TRANSIT"
 
       document.querySelectorAll(".route-info").forEach(e => e.style.display = "none")
       document.querySelectorAll(".transit-steps").forEach(e => e.innerHTML = "")
 
-      const div = document.getElementById(msgId)
-      const stepsDiv = document.getElementById(msgId.replace("route-msg-", "steps-"))
+      const div = byId(msgId)
+      const stepsDiv = byId(msgId.replace("route-msg-", "steps-"))
+      if (!div) return
       div.style.display = "block"
       div.innerText = "Calculare..."
 
@@ -776,7 +828,7 @@
 
             div.innerHTML = `${icon} ${leg.duration.text} (${leg.distance.text})`
 
-            if (tryMode === "TRANSIT") {
+            if (tryMode === "TRANSIT" && stepsDiv) {
               let stepSummary = ""
               leg.steps.forEach(step => {
                 if (step.travel_mode === "TRANSIT" && step.transit) {
@@ -788,7 +840,7 @@
                 }
               })
               stepsDiv.innerHTML = stepSummary ? ("Traseu: " + stepSummary) : "Doar mers pe jos (prea aproape)."
-            } else {
+            } else if (stepsDiv) {
               stepsDiv.innerHTML = note ? `<span class="mini-muted">${note}</span>` : ""
             }
           } else {
