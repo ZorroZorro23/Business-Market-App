@@ -67,7 +67,7 @@
       font-size: 10px; padding: 5px; text-align: center; pointer-events: none; z-index: 99;
     }
 
-    #map { flex: 1; height: 100%; }
+    #map { flex: 1; height: 100vh; width: 100%; background:#111; }
 
     .mini-block {
       background: rgba(255,255,255,0.04);
@@ -114,10 +114,9 @@
       color: #3b82f6;
       margin-bottom: 0;
       text-transform: none;
+      white-space: nowrap;
     }
-    .auth-btn:hover {
-      background: rgba(59,130,246,0.12);
-    }
+    .auth-btn:hover { background: rgba(59,130,246,0.12); }
 
     @media (max-width: 768px) {
       body { flex-direction: column; }
@@ -185,7 +184,6 @@
 
     <div style="font-size:11px; color:#666; margin-top:5px">
       Rezultate: <span id="count">0</span>
-      <span style="float:right"><a href="./admin.html" style="color:#3b82f6; text-decoration:none">Admin</a></span>
     </div>
 
     <div id="historyBox" class="mini-block" style="display:none;">
@@ -199,7 +197,7 @@
     <div id="results"></div>
   </div>
 
-  <div style="position:relative; flex:1">
+  <div style="position:relative; flex:1; min-width: 0;">
     <div id="map"></div>
     <div id="sv-panel">
       <button id="sv-close" onclick="document.getElementById('sv-panel').style.display='none'">X</button>
@@ -452,6 +450,8 @@
       document.getElementById("rad").addEventListener("input", saveState)
     }
 
+    window.initMap = initMap
+
     function locateUser() {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -465,6 +465,7 @@
     }
 
     function updateMapCenter() {
+      if (!map || !circle) return
       map.setCenter(userPos)
       map.setZoom(15)
       circle.setCenter(userPos)
@@ -632,8 +633,8 @@
           if (status === "OK") {
             directionsRenderer.setDirections(res)
             const leg = res.routes[0].legs[0]
-
             const icon = iconForMode(tryMode)
+
             div.innerHTML = `${icon} ${leg.duration.text} (${leg.distance.text})`
 
             if (tryMode === "TRANSIT") {
@@ -683,6 +684,15 @@
       l.download = "analiza_piata.csv"
       l.click()
     }
+
+    setTimeout(() => {
+      const g = window.google && window.google.maps
+      const mapEl = document.getElementById("map")
+      const hasMap = mapEl && mapEl.querySelector("canvas")
+      if (g && !hasMap && typeof window.initMap === "function") {
+        window.initMap()
+      }
+    }, 1500)
   </script>
 
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCvbL5aBjXtO-_61bYgMKj2G9o3sEtztGY&libraries=places,geometry&callback=initMap" async defer></script>
