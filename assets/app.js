@@ -192,13 +192,7 @@ function writeResultsHistory(arr) {
 
 function historyKey(entry) {
   const city = (entry.city || "").trim().toLowerCase()
-  return [
-    city,
-    entry.cat || "",
-    String(entry.rad || ""),
-    entry.sort || "",
-    entry.mode || ""
-  ].join("|")
+  return [city, entry.cat || "", String(entry.rad || ""), entry.sort || "", entry.mode || ""].join("|")
 }
 
 function saveResultsToHistory(payload) {
@@ -368,27 +362,25 @@ function initMap() {
   }
 
   addGrabControl()
-
   new google.maps.TransitLayer().setMap(map)
 
   directionsService = new google.maps.DirectionsService()
   directionsRenderer = new google.maps.DirectionsRenderer({
     map: map,
-    suppressMarkers: true,
-    polylineOptions: { strokeColor: "#3b82f6", strokeWeight: 6, strokeOpacity: 0.7 }
+    suppressMarkers: true
   })
 
-  miniStreetView = new google.maps.StreetViewPanorama(
-    byId("sv-container"),
-    {
-      position: userPos,
-      pov: { heading: 34, pitch: 10 },
-      visible: true,
-      disableDefaultUI: false,
-      zoomControl: true,
-      panControl: true
-    }
-  )
+  miniStreetView = new google.maps.StreetViewPanorama(byId("sv-container"), {
+    position: userPos,
+    pov: { heading: 34, pitch: 10 },
+    visible: false,
+    disableDefaultUI: false,
+    zoomControl: true,
+    panControl: true
+  })
+
+  const svPanel = byId("sv-panel")
+  if (svPanel) svPanel.style.display = "none"
 
   const radius = byId("rad") ? parseInt(byId("rad").value, 10) : 1500
 
@@ -453,6 +445,12 @@ function updateMapCenter() {
   circle.setCenter(userPos)
 }
 
+function closeStreetView() {
+  const panel = byId("sv-panel")
+  if (panel) panel.style.display = "none"
+  if (miniStreetView && miniStreetView.setVisible) miniStreetView.setVisible(false)
+}
+
 function updateRouteMode() {
   saveState()
   if (currentSelectedDest && currentSelectedMsgId) {
@@ -510,7 +508,10 @@ function renderResultsFromPlaces(places) {
 
       const panel = byId("sv-panel")
       if (panel) panel.style.display = "block"
-      if (miniStreetView) miniStreetView.setPosition(dest)
+      if (miniStreetView) {
+        miniStreetView.setPosition(dest)
+        if (miniStreetView.setVisible) miniStreetView.setVisible(true)
+      }
 
       const svService = new google.maps.StreetViewService()
       svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
@@ -557,7 +558,7 @@ function renderResultsFromPlaces(places) {
 function showSavedResults(entry) {
   if (!entry || !entry.results) return
   directionsRenderer.setDirections({ routes: [] })
-  byId("sv-panel").style.display = "none"
+  closeStreetView()
   currentSelectedDest = null
   currentSelectedMsgId = null
 
@@ -579,8 +580,12 @@ function selectSavedPlace(f) {
   currentSelectedMsgId = "route-msg-fav"
 
   directionsRenderer.setDirections({ routes: [] })
-  byId("sv-panel").style.display = "block"
-  miniStreetView.setPosition(dest)
+  const panel = byId("sv-panel")
+  if (panel) panel.style.display = "block"
+  if (miniStreetView) {
+    miniStreetView.setPosition(dest)
+    if (miniStreetView.setVisible) miniStreetView.setVisible(true)
+  }
 
   const svService = new google.maps.StreetViewService()
   svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
@@ -601,7 +606,7 @@ async function runScan() {
 
   circle.setRadius(r)
   directionsRenderer.setDirections({ routes: [] })
-  byId("sv-panel").style.display = "none"
+  closeStreetView()
   currentSelectedDest = null
   currentSelectedMsgId = null
 
@@ -719,3 +724,4 @@ byId("tabFavs")?.addEventListener("click", () => { setTab("favs"); renderFavs() 
 window.runScan = runScan
 window.locateUser = locateUser
 window.updateRouteMode = updateRouteMode
+window.closeStreetView = closeStreetView
