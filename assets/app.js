@@ -192,7 +192,13 @@ function writeResultsHistory(arr) {
 
 function historyKey(entry) {
   const city = (entry.city || "").trim().toLowerCase()
-  return [city, entry.cat || "", String(entry.rad || ""), entry.sort || "", entry.mode || ""].join("|")
+  return [
+    city,
+    entry.cat || "",
+    String(entry.rad || ""),
+    entry.sort || "",
+    entry.mode || ""
+  ].join("|")
 }
 
 function saveResultsToHistory(payload) {
@@ -320,6 +326,26 @@ function initTabs() {
   if (c) c.onclick = () => { setTab("favs"); renderFavs() }
 }
 
+function initMobileZoomButtons() {
+  const zin = byId("zoomInBtn")
+  const zout = byId("zoomOutBtn")
+  if (!zin || !zout) return
+
+  zin.onclick = () => {
+    if (!map) return
+    const z = map.getZoom()
+    if (typeof z !== "number") return
+    map.setZoom(z + 1)
+  }
+
+  zout.onclick = () => {
+    if (!map) return
+    const z = map.getZoom()
+    if (typeof z !== "number") return
+    map.setZoom(z - 1)
+  }
+}
+
 function initMap() {
   loadState()
   initTabs()
@@ -335,6 +361,8 @@ function initMap() {
     mapTypeControl: false,
     gestureHandling: "cooperative"
   })
+
+  initMobileZoomButtons()
 
   let grabEnabled = false
 
@@ -362,25 +390,27 @@ function initMap() {
   }
 
   addGrabControl()
+
   new google.maps.TransitLayer().setMap(map)
 
   directionsService = new google.maps.DirectionsService()
   directionsRenderer = new google.maps.DirectionsRenderer({
     map: map,
-    suppressMarkers: true
+    suppressMarkers: true,
+    polylineOptions: { strokeColor: "#3b82f6", strokeWeight: 6, strokeOpacity: 0.7 }
   })
 
-  miniStreetView = new google.maps.StreetViewPanorama(byId("sv-container"), {
-    position: userPos,
-    pov: { heading: 34, pitch: 10 },
-    visible: false,
-    disableDefaultUI: false,
-    zoomControl: true,
-    panControl: true
-  })
-
-  const svPanel = byId("sv-panel")
-  if (svPanel) svPanel.style.display = "none"
+  miniStreetView = new google.maps.StreetViewPanorama(
+    byId("sv-container"),
+    {
+      position: userPos,
+      pov: { heading: 34, pitch: 10 },
+      visible: true,
+      disableDefaultUI: false,
+      zoomControl: true,
+      panControl: true
+    }
+  )
 
   const radius = byId("rad") ? parseInt(byId("rad").value, 10) : 1500
 
@@ -425,51 +455,24 @@ function initMap() {
 window.initMap = initMap
 
 function locateUser() {
-  if (!navigator.geolocation) {
-    alert("GPS indisponibil: browserul nu suportă Geolocation.")
-    return
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        userPos = { lat: p.coords.latitude, lng: p.coords.longitude }
+        updateMapCenter()
+      },
+      () => { alert("Eroare GPS.") }
+    )
+  } else {
+    alert("Fara suport GPS.")
   }
-
-  const opts = {
-    enableHighAccuracy: true,
-    timeout: 12000,
-    maximumAge: 10000
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    (p) => {
-      userPos = { lat: p.coords.latitude, lng: p.coords.longitude }
-      updateMapCenter()
-    },
-    (err) => {
-      let msg = "Eroare GPS."
-      if (err && typeof err.code === "number") {
-        if (err.code === 1) msg = "GPS: permisiune refuzată. Activează Location pentru site și reîncearcă."
-        else if (err.code === 2) msg = "GPS: poziția nu e disponibilă (semnal slab / Location oprit)."
-        else if (err.code === 3) msg = "GPS: timeout. Încearcă iar (și activează High Accuracy)."
-      }
-
-      const secure = typeof location !== "undefined" && location.protocol === "https:"
-      if (!secure) msg += " (Notă: GPS merge doar pe HTTPS sau localhost.)"
-
-      alert(msg)
-    },
-    opts
-  )
 }
-
 
 function updateMapCenter() {
   if (!map || !circle) return
   map.setCenter(userPos)
   map.setZoom(15)
   circle.setCenter(userPos)
-}
-
-function closeStreetView() {
-  const panel = byId("sv-panel")
-  if (panel) panel.style.display = "none"
-  if (miniStreetView && miniStreetView.setVisible) miniStreetView.setVisible(false)
 }
 
 function updateRouteMode() {
@@ -529,10 +532,7 @@ function renderResultsFromPlaces(places) {
 
       const panel = byId("sv-panel")
       if (panel) panel.style.display = "block"
-      if (miniStreetView) {
-        miniStreetView.setPosition(dest)
-        if (miniStreetView.setVisible) miniStreetView.setVisible(true)
-      }
+      if (miniStreetView) miniStreetView.setPosition(dest)
 
       const svService = new google.maps.StreetViewService()
       svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
@@ -579,7 +579,7 @@ function renderResultsFromPlaces(places) {
 function showSavedResults(entry) {
   if (!entry || !entry.results) return
   directionsRenderer.setDirections({ routes: [] })
-  closeStreetView()
+  byId("sv-panel").style.display = "none"
   currentSelectedDest = null
   currentSelectedMsgId = null
 
@@ -601,12 +601,8 @@ function selectSavedPlace(f) {
   currentSelectedMsgId = "route-msg-fav"
 
   directionsRenderer.setDirections({ routes: [] })
-  const panel = byId("sv-panel")
-  if (panel) panel.style.display = "block"
-  if (miniStreetView) {
-    miniStreetView.setPosition(dest)
-    if (miniStreetView.setVisible) miniStreetView.setVisible(true)
-  }
+  byId("sv-panel").style.display = "block"
+  miniStreetView.setPosition(dest)
 
   const svService = new google.maps.StreetViewService()
   svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
@@ -627,7 +623,7 @@ async function runScan() {
 
   circle.setRadius(r)
   directionsRenderer.setDirections({ routes: [] })
-  closeStreetView()
+  byId("sv-panel").style.display = "none"
   currentSelectedDest = null
   currentSelectedMsgId = null
 
@@ -745,4 +741,3 @@ byId("tabFavs")?.addEventListener("click", () => { setTab("favs"); renderFavs() 
 window.runScan = runScan
 window.locateUser = locateUser
 window.updateRouteMode = updateRouteMode
-window.closeStreetView = closeStreetView
