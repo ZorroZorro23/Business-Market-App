@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>AtlasGo</title>
-
+  <title>AtlasGo Market Scanner</title>
   <style>
     html, body { height: 100%; }
     body {
       margin: 0;
-      font-family: "Segoe UI", sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       background: #1a1a1a;
       color: #eee;
       display: flex;
@@ -61,7 +60,7 @@
       color: #27ae60;
       margin-bottom: 15px;
     }
-    .btn-geo:hover { background: rgba(39,174,96,0.1); }
+    .btn-geo:hover { background: rgba(39, 174, 96, 0.1); }
 
     .topbar {
       display:flex;
@@ -70,7 +69,6 @@
       gap:10px;
       margin-bottom: 6px;
     }
-
     .auth-btn {
       width:auto;
       padding: 6px 10px;
@@ -160,75 +158,65 @@
     .step-badge {
       display: inline-block;
       background: #333;
-      border: 1px solid #444;
-      color: #fff;
-      padding: 2px 6px;
-      border-radius: 999px;
-      margin: 2px 3px 0 0;
-      font-size: 10px;
-      line-height: 1.2;
-      white-space: nowrap;
+      border: 1px solid #555;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-right: 3px;
+      margin-bottom: 2px;
     }
 
-    .best-badge {
-      position: absolute;
-      top: 8px;
-      right: 10px;
-      background: #27ae60;
-      color: #fff;
-      font-size: 10px;
-      padding: 3px 6px;
-      border-radius: 6px;
-      font-weight: 700;
-    }
+    .best-badge { position: absolute; top: 8px; right: 8px; background: #27ae60; font-size: 9px; padding: 2px 5px; border-radius: 3px; }
 
     .fav-btn {
       position: absolute;
       right: 10px;
-      bottom: 10px;
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border: 1px solid #444;
-      background: rgba(0,0,0,0.25);
-      font-size: 18px;
+      top: 36px;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: #2b2b2b;
+      border: 1px solid #555;
+      color: #f1c40f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
       cursor: pointer;
       user-select: none;
     }
-    .fav-btn:hover { background: rgba(255,255,255,0.08); }
+    .fav-btn:hover { background: #333; }
 
     .mini-action {
       position: absolute;
       right: 10px;
       bottom: 10px;
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border: 1px solid #444;
-      background: rgba(0,0,0,0.25);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: #2b2b2b;
+      border: 1px solid #555;
+      color: #ff6b6b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
       cursor: pointer;
       user-select: none;
     }
-    .mini-action:hover { background: rgba(255,255,255,0.08); }
+    .mini-action:hover { background: #333; }
 
     .row-info {
+      font-size: 11px;
+      color: #666;
+      margin-top: 5px;
       display:flex;
-      align-items:center;
-      justify-content:space-between;
-      font-size: 12px;
-      color:#ddd;
-      margin-top: 6px;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
     }
 
-    .mini-muted { font-size: 11px; color: #999; }
-
     .hint {
+      font-size: 11px;
       color: #777;
       padding: 10px;
       border: 1px dashed #333;
@@ -244,7 +232,11 @@
       background: #111;
     }
 
-    #map { width: 100%; height: 100%; background: #111; }
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #111;
+    }
 
     #sv-panel {
       position: absolute;
@@ -294,6 +286,7 @@
 
     @media (max-width: 768px) {
       body { flex-direction: column; }
+
       #sidebar {
         width: 100%;
         height: 60vh;
@@ -303,13 +296,23 @@
         z-index: 20;
         gap: 5px;
       }
-      #mapWrap { width: 100%; height: 40vh; order: 1; }
+
+      #mapWrap {
+        width: 100%;
+        height: 40vh;
+        order: 1;
+      }
+
       h2 { display: none; }
       label { display: none; }
       input, select, button { padding: 8px; margin-bottom: 5px; font-size: 13px; }
       .btn-geo { margin-bottom: 5px; padding: 5px; }
       .tabs { margin-top: 0; }
-      #panelArea { border-top: 0; padding-top: 0; }
+
+      #panelArea {
+        border-top: 0;
+        padding-top: 0;
+      }
     }
 
     .grab-control {
@@ -330,16 +333,59 @@
       line-height: 1;
       box-shadow: 0 2px 10px rgba(0,0,0,0.35);
       cursor: pointer;
+      padding: 0;
     }
 
     .grab-btn.active {
       border-color: #3b82f6;
       box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
     }
+
+    .mobile-zoom {
+      position: absolute;
+      right: 10px;
+      bottom: 140px;
+      display: none;
+      z-index: 60;
+      gap: 8px;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: auto;
+    }
+
+    .mobile-zoom button {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #fff;
+      font-size: 22px;
+      line-height: 1;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      cursor: pointer;
+      padding: 0;
+      margin: 0;
+      text-transform: none;
+    }
+
+    @media (max-width: 768px) {
+      .mobile-zoom {
+        display: flex;
+        right: 8px;
+        bottom: 130px;
+      }
+
+      .mobile-zoom button {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+      }
+    }
   </style>
 </head>
-
 <body>
+
   <div id="sidebar">
     <div class="topbar">
       <div style="display:flex; align-items:baseline; gap:8px;">
@@ -375,9 +421,8 @@
         </select>
       </div>
       <div style="flex:1">
-        <label>RAZA: <span id="rVal">500</span>m</label>
-        <input id="rad" type="range" min="100" max="5000" step="50" value="500"
-          oninput="document.getElementById('rVal').innerText=this.value">
+        <label>RAZA: <span id="rVal">1500</span>m</label>
+        <input id="rad" type="range" min="500" max="10000" value="1500" step="100" oninput="document.getElementById('rVal').innerText=this.value">
       </div>
     </div>
 
@@ -418,8 +463,14 @@
 
   <div id="mapWrap">
     <div id="map"></div>
+
+    <div id="mobileZoom" class="mobile-zoom">
+      <button id="zoomInBtn" type="button" aria-label="Zoom in">+</button>
+      <button id="zoomOutBtn" type="button" aria-label="Zoom out">−</button>
+    </div>
+
     <div id="sv-panel">
-      <button id="sv-close" onclick="if (window.closeStreetView) window.closeStreetView(); else document.getElementById('sv-panel').style.display='none'">X</button>
+      <button id="sv-close" onclick="document.getElementById('sv-panel').style.display='none'">X</button>
       <div id="sv-container"></div>
       <div id="sv-label">Street View Interactiv</div>
     </div>
@@ -427,6 +478,6 @@
 
   <script type="module" src="./assets/firebase.js"></script>
   <script src="./assets/app.js"></script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVUuZoOvpy8g01RbOrh5R9ZtV-sxUBAkU&libraries=places,geometry&callback=initMap" async defer></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCvbL5aBjXtO-_61bYgMKj2G9o3sEtztGY&libraries=places,geometry&callback=initMap" async defer></script>
 </body>
 </html>
