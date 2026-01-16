@@ -301,7 +301,10 @@ let map, circle, service, directionsService, directionsRenderer
       if (!st) return
       if (byId("city") && typeof st.city === "string") byId("city").value = st.city
       if (byId("cat") && typeof st.cat === "string") byId("cat").value = st.cat
-      if (byId("travelMode") && typeof st.mode === "string") byId("travelMode").value = st.mode
+      if (byId("travelMode") && typeof st.mode === "string") {
+  const m = st.mode === "BICYCLING" ? "WALKING" : st.mode
+  byId("travelMode").value = m
+}
       if (byId("sort") && typeof st.sort === "string") byId("sort").value = st.sort
       if (byId("rad") && typeof st.rad === "number") byId("rad").value = String(st.rad)
       if (byId("rVal") && typeof st.rad === "number") byId("rVal").innerText = String(st.rad)
