@@ -425,18 +425,39 @@ function initMap() {
 window.initMap = initMap
 
 function locateUser() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        userPos = { lat: p.coords.latitude, lng: p.coords.longitude }
-        updateMapCenter()
-      },
-      () => { alert("Eroare GPS.") }
-    )
-  } else {
-    alert("Fara suport GPS.")
+  if (!navigator.geolocation) {
+    alert("GPS indisponibil: browserul nu suportă Geolocation.")
+    return
   }
+
+  const opts = {
+    enableHighAccuracy: true,
+    timeout: 12000,
+    maximumAge: 10000
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      userPos = { lat: p.coords.latitude, lng: p.coords.longitude }
+      updateMapCenter()
+    },
+    (err) => {
+      let msg = "Eroare GPS."
+      if (err && typeof err.code === "number") {
+        if (err.code === 1) msg = "GPS: permisiune refuzată. Activează Location pentru site și reîncearcă."
+        else if (err.code === 2) msg = "GPS: poziția nu e disponibilă (semnal slab / Location oprit)."
+        else if (err.code === 3) msg = "GPS: timeout. Încearcă iar (și activează High Accuracy)."
+      }
+
+      const secure = typeof location !== "undefined" && location.protocol === "https:"
+      if (!secure) msg += " (Notă: GPS merge doar pe HTTPS sau localhost.)"
+
+      alert(msg)
+    },
+    opts
+  )
 }
+
 
 function updateMapCenter() {
   if (!map || !circle) return
