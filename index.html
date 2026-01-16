@@ -411,3 +411,29 @@
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCvbL5aBjXtO-_61bYgMKj2G9o3sEtztGY&libraries=places,geometry&callback=initMap" async defer></script>
 </body>
 </html>
+
+  .grab-control {
+  margin: 10px 10px 110px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.grab-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid #444;
+  background: #2a2a2a;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+  cursor: pointer;
+}
+
+.grab-btn.active {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
+}
+
