@@ -326,13 +326,41 @@ let map, circle, service, directionsService, directionsRenderer
       renderFavs()
       renderHistory()
 
-      map = new google.maps.Map(byId("map"), {
-        center: userPos,
-        zoom: 13,
-        disableDefaultUI: false,
-        streetViewControl: true,
-        mapTypeControl: false
-      })
+let grabEnabled = false
+
+function setGrabEnabled(on) {
+  grabEnabled = !!on
+  map.setOptions({ gestureHandling: grabEnabled ? "greedy" : "cooperative" })
+  const btn = byId("grabBtn")
+  if (btn) btn.classList.toggle("active", grabEnabled)
+}
+
+function addGrabControl() {
+  const controlDiv = document.createElement("div")
+  controlDiv.className = "grab-control"
+
+  const button = document.createElement("button")
+  button.type = "button"
+  button.id = "grabBtn"
+  button.className = "grab-btn"
+  button.title = "Grab (1 deget pe telefon)"
+  button.innerText = "🖐️"
+  button.addEventListener("click", () => setGrabEnabled(!grabEnabled))
+
+  controlDiv.appendChild(button)
+  map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(controlDiv)
+}
+
+addGrabControl()
+        
+    map = new google.maps.Map(byId("map"), {
+  center: userPos,
+  zoom: 13,
+  disableDefaultUI: false,
+  streetViewControl: true,
+  mapTypeControl: false,
+  gestureHandling: "cooperative"
+})
 
       new google.maps.TransitLayer().setMap(map)
 
