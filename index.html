@@ -16,6 +16,10 @@
       overflow: hidden;
     }
 
+    @supports (height: 100dvh) {
+      body { height: 100dvh; }
+    }
+
     #sidebar {
       width: 350px;
       background: #222;
@@ -27,6 +31,9 @@
       z-index: 10;
       box-shadow: 2px 0 10px #000;
       min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
 
     h2 { color: #3b82f6; margin: 0; font-size: 22px; }
@@ -232,6 +239,10 @@
       background: #111;
     }
 
+    @supports (height: 100dvh) {
+      #mapWrap { height: 100dvh; }
+    }
+
     #map {
       width: 100%;
       height: 100%;
@@ -244,6 +255,8 @@
       right: 20px;
       width: 350px;
       height: 250px;
+      max-width: calc(100vw - 24px);
+      max-height: calc(100vh - 120px);
       background: #000;
       border: 3px solid #fff;
       border-radius: 8px;
@@ -293,6 +306,7 @@
         order: 2;
         box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
         padding: 10px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
         z-index: 20;
         gap: 5px;
       }
@@ -301,6 +315,19 @@
         width: 100%;
         height: 40vh;
         order: 1;
+      }
+
+      @supports (height: 100dvh) {
+        #sidebar { height: 60dvh; }
+        #mapWrap { height: 40dvh; }
+      }
+
+      #sv-panel {
+        right: 8px;
+        bottom: 8px;
+        width: calc(100vw - 16px);
+        height: 200px;
+        border-width: 2px;
       }
 
       h2 { display: none; }
@@ -437,10 +464,10 @@
 
     <div class="row-info">
       <span>Rezultate: <span id="count">0</span></span>
-      <span style="color:#666">★ Favorite • 🕘 Istoric</span>
+      <span id="authOnlyMeta" style="color:#666">★ Favorite • 🕘 Istoric</span>
     </div>
 
-    <div class="tabs">
+    <div id="tabsRow" class="tabs">
       <button id="tabResults" class="tab-btn active" type="button">Rezultate</button>
       <button id="tabHistory" class="tab-btn" type="button">Istoric</button>
       <button id="tabFavs" class="tab-btn" type="button">Favorite</button>
