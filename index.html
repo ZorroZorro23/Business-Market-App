@@ -369,16 +369,23 @@
     }
 
     .mobile-zoom {
-      position: absolute;
-      right: 10px;
-      bottom: 140px;
-      display: none;
-      z-index: 60;
-      gap: 8px;
-      flex-direction: column;
-      align-items: center;
-      pointer-events: auto;
-    }
+  position: absolute;
+  right: 8px;
+  top: 80px;
+  bottom: auto;
+  display: none;
+  z-index: 60;
+  gap: 8px;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.mobile-zoom button.active {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
+}
+
 
     .mobile-zoom button {
       width: 44px;
