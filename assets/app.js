@@ -52,8 +52,31 @@ function updateAuthButton() {
   }
 }
 
+function updateRestrictedUI() {
+  const u = getAuthUser()
+  const show = Boolean(u)
+
+  const tabsRow = byId("tabsRow")
+  const tabHistory = byId("tabHistory")
+  const tabFavs = byId("tabFavs")
+  const authOnlyMeta = byId("authOnlyMeta")
+
+  if (tabHistory) tabHistory.style.display = show ? "" : "none"
+  if (tabFavs) tabFavs.style.display = show ? "" : "none"
+  if (authOnlyMeta) authOnlyMeta.style.display = show ? "" : "none"
+
+  if (tabsRow) {
+    tabsRow.style.gridTemplateColumns = show ? "1fr 1fr 1fr" : "1fr"
+  }
+
+  if (!show) {
+    setTab("results")
+  }
+}
+
 window.addEventListener("auth-changed", () => {
   updateAuthButton()
+  updateRestrictedUI()
   renderFavs()
   renderHistory()
 })
@@ -202,7 +225,7 @@ function historyKey(entry) {
 }
 
 function saveResultsToHistory(payload) {
-  const u = requireLoginOrWarn()
+  const u = getAuthUser()
   if (!u) return
 
   const arr = readResultsHistory()
@@ -350,6 +373,7 @@ function initMap() {
   loadState()
   initTabs()
   updateAuthButton()
+  updateRestrictedUI()
   renderFavs()
   renderHistory()
 
