@@ -52,6 +52,21 @@ function updateAuthButton() {
   }
 }
 
+function setTab(name) {
+  const tabs = [
+    { btn: "tabResults", panel: "panelResults", name: "results" },
+    { btn: "tabHistory", panel: "panelHistory", name: "history" },
+    { btn: "tabFavs", panel: "panelFavs", name: "favs" }
+  ]
+
+  tabs.forEach(t => {
+    const b = byId(t.btn)
+    const p = byId(t.panel)
+    if (b) b.classList.toggle("active", t.name === name)
+    if (p) p.classList.toggle("active", t.name === name)
+  })
+}
+
 function updateRestrictedUI() {
   const u = getAuthUser()
   const show = Boolean(u)
@@ -69,9 +84,7 @@ function updateRestrictedUI() {
     tabsRow.style.gridTemplateColumns = show ? "1fr 1fr 1fr" : "1fr"
   }
 
-  if (!show) {
-    setTab("results")
-  }
+  if (!show) setTab("results")
 }
 
 window.addEventListener("auth-changed", () => {
@@ -80,21 +93,6 @@ window.addEventListener("auth-changed", () => {
   renderFavs()
   renderHistory()
 })
-
-function setTab(name) {
-  const tabs = [
-    { btn: "tabResults", panel: "panelResults", name: "results" },
-    { btn: "tabHistory", panel: "panelHistory", name: "history" },
-    { btn: "tabFavs", panel: "panelFavs", name: "favs" }
-  ]
-
-  tabs.forEach(t => {
-    const b = byId(t.btn)
-    const p = byId(t.panel)
-    if (b) b.classList.toggle("active", t.name === name)
-    if (p) p.classList.toggle("active", t.name === name)
-  })
-}
 
 function readFavs() {
   const f = safeParseJSON(localStorage.getItem(LS_FAVS), {})
@@ -349,24 +347,30 @@ function initTabs() {
   if (c) c.onclick = () => { setTab("favs"); renderFavs() }
 }
 
-function initMobileZoomButtons() {
+function initMobileControls(mapInstance) {
   const zin = byId("zoomInBtn")
   const zout = byId("zoomOutBtn")
-  if (!zin || !zout) return
+  const grab = byId("grabBtn")
 
-  zin.onclick = () => {
-    if (!map) return
-    const z = map.getZoom()
-    if (typeof z !== "number") return
-    map.setZoom(z + 1)
+  if (zin) {
+    zin.onclick = () => {
+      if (!mapInstance) return
+      const z = mapInstance.getZoom()
+      if (typeof z !== "number") return
+      mapInstance.setZoom(z + 1)
+    }
   }
 
-  zout.onclick = () => {
-    if (!map) return
-    const z = map.getZoom()
-    if (typeof z !== "number") return
-    map.setZoom(z - 1)
+  if (zout) {
+    zout.onclick = () => {
+      if (!mapInstance) return
+      const z = mapInstance.getZoom()
+      if (typeof z !== "number") return
+      mapInstance.setZoom(z - 1)
+    }
   }
+
+  return { grabBtn: grab }
 }
 
 function initMap() {
@@ -377,16 +381,19 @@ function initMap() {
   renderFavs()
   renderHistory()
 
+  const isMobile = window.matchMedia("(max-width: 768px)").matches
+
   map = new google.maps.Map(byId("map"), {
     center: userPos,
     zoom: 13,
     disableDefaultUI: false,
+    zoomControl: !isMobile,
     streetViewControl: true,
     mapTypeControl: false,
     gestureHandling: "cooperative"
   })
 
-  initMobileZoomButtons()
+  const controls = initMobileControls(map)
 
   let grabEnabled = false
 
@@ -397,23 +404,9 @@ function initMap() {
     if (btn) btn.classList.toggle("active", grabEnabled)
   }
 
-  function addGrabControl() {
-    const controlDiv = document.createElement("div")
-    controlDiv.className = "grab-control"
-
-    const button = document.createElement("button")
-    button.type = "button"
-    button.id = "grabBtn"
-    button.className = "grab-btn"
-    button.title = "Grab (1 deget pe telefon)"
-    button.innerText = "🖐️"
-    button.addEventListener("click", () => setGrabEnabled(!grabEnabled))
-
-    controlDiv.appendChild(button)
-    map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(controlDiv)
+  if (controls.grabBtn) {
+    controls.grabBtn.onclick = () => setGrabEnabled(!grabEnabled)
   }
-
-  addGrabControl()
 
   new google.maps.TransitLayer().setMap(map)
 
@@ -603,7 +596,8 @@ function renderResultsFromPlaces(places) {
 function showSavedResults(entry) {
   if (!entry || !entry.results) return
   directionsRenderer.setDirections({ routes: [] })
-  byId("sv-panel").style.display = "none"
+  const sv = byId("sv-panel")
+  if (sv) sv.style.display = "none"
   currentSelectedDest = null
   currentSelectedMsgId = null
 
@@ -625,12 +619,16 @@ function selectSavedPlace(f) {
   currentSelectedMsgId = "route-msg-fav"
 
   directionsRenderer.setDirections({ routes: [] })
-  byId("sv-panel").style.display = "block"
-  miniStreetView.setPosition(dest)
+  const sv = byId("sv-panel")
+  if (sv) sv.style.display = "block"
+  if (miniStreetView) miniStreetView.setPosition(dest)
 
   const svService = new google.maps.StreetViewService()
   svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
-    if (status !== "OK") byId("sv-panel").style.display = "none"
+    if (status !== "OK") {
+      const p = byId("sv-panel")
+      if (p) p.style.display = "none"
+    }
   })
 
   calculateAndDisplayRoute(dest, currentSelectedMsgId)
@@ -647,7 +645,8 @@ async function runScan() {
 
   circle.setRadius(r)
   directionsRenderer.setDirections({ routes: [] })
-  byId("sv-panel").style.display = "none"
+  const sv = byId("sv-panel")
+  if (sv) sv.style.display = "none"
   currentSelectedDest = null
   currentSelectedMsgId = null
 
