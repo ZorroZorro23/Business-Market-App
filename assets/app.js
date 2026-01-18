@@ -383,15 +383,16 @@ function initMap() {
 
   const isMobile = window.matchMedia("(max-width: 768px)").matches
 
-  map = new google.maps.Map(byId("map"), {
-    center: userPos,
-    zoom: 13,
-    disableDefaultUI: false,
-    zoomControl: !isMobile,
-    streetViewControl: true,
-    mapTypeControl: false,
-    gestureHandling: "cooperative"
-  })
+ map = new google.maps.Map(byId("map"), {
+  center: userPos,
+  zoom: 13,
+  disableDefaultUI: false,
+  zoomControl: !isMobile,
+  streetViewControl: !isMobile,
+  mapTypeControl: false,
+  gestureHandling: "cooperative"
+})
+
 
   const controls = initMobileControls(map)
 
