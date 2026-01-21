@@ -2,101 +2,50 @@
 <html lang="ro">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AtlasGo</title>
   <link rel="stylesheet" href="./assets/css/styles.css" />
 </head>
 <body>
+  <header class="topbar">
+    <h1 class="title">AtlasGo</h1>
+  </header>
 
-<header>
-  <h1>AtlasGo</h1>
-</header>
+  <main class="layout">
+    <aside class="controls">
+      <div class="row">
+        <label class="label" for="radiusInput">Rază (m):</label>
+        <input id="radiusInput" type="number" value="1500" min="100" />
+      </div>
 
-<main>
-  <aside class="controls">
-    <label>
-      Rază (m):
-      <input id="radiusInput" type="number" value="1500" min="100" />
-    </label>
+      <div class="row">
+        <label class="label" for="typeSelect">Categorie:</label>
+        <select id="typeSelect">
+          <option value="">Toate</option>
+          <option value="restaurant">Restaurant</option>
+          <option value="cafe">Cafe</option>
+          <option value="pharmacy">Farmacie</option>
+          <option value="atm">ATM</option>
+          <option value="hospital">Spital</option>
+          <option value="gas_station">Benzinărie</option>
+          <option value="supermarket">Supermarket</option>
+        </select>
+      </div>
 
-    <label>
-      Categorie:
-      <select id="typeSelect">
-        <option value="">Toate</option>
-        <option value="restaurant">Restaurant</option>
-        <option value="cafe">Cafe</option>
-        <option value="pharmacy">Farmacie</option>
-        <option value="atm">ATM</option>
-        <option value="hospital">Spital</option>
-        <option value="gas_station">Benzinărie</option>
-      </select>
-    </label>
+      <div class="buttons">
+        <button id="gpsBtn" type="button">Folosește GPS</button>
+        <button id="scanBtn" type="button">Caută în zonă</button>
+      </div>
 
-    <button id="gpsBtn">Folosește GPS</button>
-    <button id="scanBtn">Caută în zonă</button>
+      <ol id="resultsList" class="results"></ol>
+    </aside>
 
-    <ol id="resultsList"></ol>
-  </aside>
+    <section class="mapWrap">
+      <div id="map"></div>
+    </section>
+  </main>
 
-  <section id="map"></section>
-</main>
-
-<!-- Google Maps -->
-<script src="https://maps.googleapis.com/maps/api/js?key=<!DOCTYPE html>
-<html lang="ro">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>AtlasGo</title>
-  <link rel="stylesheet" href="./assets/css/styles.css" />
-</head>
-<body>
-
-<header>
-  <h1>AtlasGo</h1>
-</header>
-
-<main>
-  <aside class="controls">
-    <label>
-      Rază (m):
-      <input id="radiusInput" type="number" value="1500" min="100" />
-    </label>
-
-    <label>
-      Categorie:
-      <select id="typeSelect">
-        <option value="">Toate</option>
-        <option value="restaurant">Restaurant</option>
-        <option value="cafe">Cafe</option>
-        <option value="pharmacy">Farmacie</option>
-        <option value="atm">ATM</option>
-        <option value="hospital">Spital</option>
-        <option value="gas_station">Benzinărie</option>
-      </select>
-    </label>
-
-    <button id="gpsBtn">Folosește GPS</button>
-    <button id="scanBtn">Caută în zonă</button>
-
-    <ol id="resultsList"></ol>
-  </aside>
-
-  <section id="map"></section>
-</main>
-
-<!-- Google Maps -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVUuZoOvpy8g01RbOrh5R9ZtV-sxUBAkU&libraries=places,geometry"></script>
-
-<!-- App -->
-<script type="module" src="./assets/js/app.js"></script>
-
-</body>
-</html>
-&libraries=places,geometry"></script>
-
-<!-- App -->
-<script type="module" src="./assets/js/app.js"></script>
-
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVUuZoOvpy8g01RbOrh5R9ZtV-sxUBAkU&libraries=places,geometry"></script>
+  <script type="module" src="./assets/js/app.js"></script>
 </body>
 </html>
