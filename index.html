@@ -2,50 +2,518 @@
 <html lang="ro">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AtlasGo</title>
-  <link rel="stylesheet" href="./assets/css/styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>AtlasGo Market Scanner</title>
+  <style>
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a1a;
+      color: #eee;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    @supports (height: 100dvh) {
+      body { height: 100dvh; }
+    }
+
+    #sidebar {
+      width: 350px;
+      background: #222;
+      border-right: 1px solid #444;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+      box-shadow: 2px 0 10px #000;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    h2 { color: #3b82f6; margin: 0; font-size: 22px; }
+    label { font-size: 11px; color: #aaa; font-weight: bold; display: block; margin-bottom: 3px; }
+
+    input, select, button {
+      width: 100%;
+      padding: 8px;
+      background: #333;
+      border: 1px solid #555;
+      color: white;
+      border-radius: 4px;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+    }
+
+    button {
+      font-weight: bold;
+      cursor: pointer;
+      text-transform: uppercase;
+      border: none;
+      transition: 0.2s;
+    }
+
+    .btn-scan { background: #3b82f6; margin-top: 5px; }
+    .btn-scan:hover { background: #2563eb; }
+
+    .btn-geo {
+      background: transparent;
+      border: 1px solid #27ae60;
+      color: #27ae60;
+      margin-bottom: 15px;
+    }
+    .btn-geo:hover { background: rgba(39, 174, 96, 0.1); }
+
+    .topbar {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom: 6px;
+    }
+    .auth-btn {
+      width:auto;
+      padding: 6px 10px;
+      font-size: 11px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid #3b82f6;
+      color: #3b82f6;
+      margin-bottom: 0;
+      text-transform: none;
+      white-space: nowrap;
+    }
+    .auth-btn:hover { background: rgba(59,130,246,0.12); }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+    .tab-btn {
+      margin: 0;
+      padding: 8px 6px;
+      font-size: 11px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid #333;
+      color: #ddd;
+      text-transform: none;
+      font-weight: 700;
+    }
+    .tab-btn.active {
+      border-color: #3b82f6;
+      background: rgba(59,130,246,0.18);
+      color: #fff;
+    }
+
+    #panelArea {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid #444;
+      padding-top: 10px;
+      gap: 10px;
+    }
+
+    .panel {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .panel.active {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #resultsList, #historyList, #favList {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .card {
+      padding: 12px;
+      border-bottom: 1px solid #333;
+      cursor: pointer;
+      position: relative;
+      transition: 0.2s;
+      display: flex;
+      gap: 10px;
+    }
+    .card:hover { background: #2a2a2a; border-left: 3px solid #3b82f6; }
+
+    .place-img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; background: #444; }
+    .place-info { flex: 1; padding-right: 54px; }
+
+    .route-info { font-size: 11px; color: #27ae60; margin-top: 5px; font-weight: bold; display: none; }
+    .transit-steps {
+      font-size: 10px; color: #ddd; margin-top: 4px;
+      background: rgba(255,255,255,0.1); padding: 4px; border-radius: 4px;
+    }
+    .step-badge {
+      display: inline-block;
+      background: #333;
+      border: 1px solid #555;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-right: 3px;
+      margin-bottom: 2px;
+    }
+
+    .best-badge { position: absolute; top: 8px; right: 8px; background: #27ae60; font-size: 9px; padding: 2px 5px; border-radius: 3px; }
+
+    .fav-btn {
+      position: absolute;
+      right: 10px;
+      top: 36px;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: #2b2b2b;
+      border: 1px solid #555;
+      color: #f1c40f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .fav-btn:hover { background: #333; }
+
+    .mini-action {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: #2b2b2b;
+      border: 1px solid #555;
+      color: #ff6b6b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .mini-action:hover { background: #333; }
+
+    .row-info {
+      font-size: 11px;
+      color: #666;
+      margin-top: 5px;
+      display:flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: #777;
+      padding: 10px;
+      border: 1px dashed #333;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    #mapWrap {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+      height: 100vh;
+      background: #111;
+    }
+
+    @supports (height: 100dvh) {
+      #mapWrap { height: 100dvh; }
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #111;
+    }
+
+    #sv-panel {
+      position: absolute;
+      bottom: 30px;
+      right: 20px;
+      width: 350px;
+      height: 250px;
+      max-width: calc(100vw - 24px);
+      max-height: calc(100vh - 120px);
+      background: #000;
+      border: 3px solid #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+      display: none;
+      z-index: 99;
+      overflow: hidden;
+    }
+    #sv-container { width: 100%; height: 100%; }
+    #sv-close {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 100;
+      padding: 0;
+      margin: 0;
+      text-transform: none;
+    }
+    #sv-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      font-size: 10px;
+      padding: 5px;
+      text-align: center;
+      pointer-events: none;
+      z-index: 99;
+    }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+
+      #sidebar {
+        width: 100%;
+        height: 60vh;
+        order: 2;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+        padding: 10px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+        z-index: 20;
+        gap: 5px;
+      }
+
+      #mapWrap {
+        width: 100%;
+        height: 40vh;
+        order: 1;
+      }
+
+      @supports (height: 100dvh) {
+        #sidebar { height: 60dvh; }
+        #mapWrap { height: 40dvh; }
+      }
+
+      #sv-panel {
+        right: 8px;
+        bottom: 8px;
+        width: calc(100vw - 16px);
+        height: 200px;
+        border-width: 2px;
+      }
+
+      h2 { display: none; }
+      label { display: none; }
+      input, select, button { padding: 8px; margin-bottom: 5px; font-size: 13px; }
+      .btn-geo { margin-bottom: 5px; padding: 5px; }
+      .tabs { margin-top: 0; }
+
+      #panelArea {
+        border-top: 0;
+        padding-top: 0;
+      }
+    }
+
+    .grab-control {
+      margin: 10px 10px 110px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .grab-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #fff;
+      font-size: 20px;
+      line-height: 1;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .grab-btn.active {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
+    }
+
+    .mobile-zoom {
+  position: absolute;
+  right: 8px;
+  top: 80px;
+  bottom: auto;
+  display: none;
+  z-index: 60;
+  gap: 8px;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.mobile-zoom button.active {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
+}
+
+
+    .mobile-zoom button {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #fff;
+      font-size: 22px;
+      line-height: 1;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      cursor: pointer;
+      padding: 0;
+      margin: 0;
+      text-transform: none;
+    }
+
+    @media (max-width: 768px) {
+      .mobile-zoom {
+        display: flex;
+        right: 8px;
+        bottom: 130px;
+      }
+
+      .mobile-zoom button {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <header class="topbar">
-    <h1 class="title">AtlasGo</h1>
-  </header>
 
-  <main class="layout">
-    <aside class="controls">
-      <div class="row">
-        <label class="label" for="radiusInput">Rază (m):</label>
-        <input id="radiusInput" type="number" value="1500" min="100" />
+  <div id="sidebar">
+    <div class="topbar">
+      <div style="display:flex; align-items:baseline; gap:8px;">
+        <h2>AtlasGo</h2>
+        <span style="font-size:12px; color:#888">v4.0 Student</span>
       </div>
+      <button id="authBtn" class="auth-btn" type="button">Login</button>
+    </div>
 
-      <div class="row">
-        <label class="label" for="typeSelect">Categorie:</label>
-        <select id="typeSelect">
-          <option value="">Toate</option>
-          <option value="restaurant">Restaurant</option>
-          <option value="cafe">Cafe</option>
-          <option value="pharmacy">Farmacie</option>
-          <option value="atm">ATM</option>
-          <option value="hospital">Spital</option>
-          <option value="gas_station">Benzinărie</option>
-          <option value="supermarket">Supermarket</option>
+    <button class="btn-geo" onclick="locateUser()">📍 Localizează-mă (GPS)</button>
+
+    <label>CAUTA ORAS</label>
+    <input id="city" type="text" placeholder="Ex: Voluntari...">
+
+    <label>CATEGORIE</label>
+    <select id="cat">
+      <option value="convenience_store">Magazine / Minimarket</option>
+      <option value="gas_station">Benzinarii</option>
+      <option value="restaurant|cafe">Restaurante</option>
+      <option value="tourist_attraction">Turism</option>
+      <option value="spa|park">Relaxare</option>
+      <option value="pharmacy">Farmacii</option>
+      <option value="gym">Sala Fitness</option>
+    </select>
+
+    <div style="display:flex; gap:10px;">
+      <div style="flex:1">
+        <label>MOD TRANSPORT</label>
+        <select id="travelMode" onchange="updateRouteMode()">
+          <option value="DRIVING">🚗 Mașină</option>
+          <option value="TRANSIT" selected>🚌 Autobuz/Metrou</option>
+          <option value="WALKING">🚶 Jos</option>
         </select>
       </div>
+      <div style="flex:1">
+        <label>RAZA: <span id="rVal">1500</span>m</label>
+        <input id="rad" type="range" min="500" max="10000" value="1500" step="100" oninput="document.getElementById('rVal').innerText=this.value">
+      </div>
+    </div>
 
-      <div class="buttons">
-        <button id="gpsBtn" type="button">Folosește GPS</button>
-        <button id="scanBtn" type="button">Caută în zonă</button>
+    <label>SORTARE</label>
+    <select id="sort">
+      <option value="dist">Distanta (Cel mai aproape)</option>
+      <option value="rate">Rating (Cel mai bun)</option>
+      <option value="best">Balansat (Best Match)</option>
+    </select>
+
+    <button class="btn-scan" onclick="runScan()">Scaneaza Zona</button>
+
+    <div class="row-info">
+      <span>Rezultate: <span id="count">0</span></span>
+      <span id="authOnlyMeta" style="color:#666">★ Favorite • 🕘 Istoric</span>
+    </div>
+
+    <div id="tabsRow" class="tabs">
+      <button id="tabResults" class="tab-btn active" type="button">Rezultate</button>
+      <button id="tabHistory" class="tab-btn" type="button">Istoric</button>
+      <button id="tabFavs" class="tab-btn" type="button">Favorite</button>
+    </div>
+
+    <div id="panelArea">
+      <div id="panelResults" class="panel active">
+        <div id="resultsList"></div>
       </div>
 
-      <ol id="resultsList" class="results"></ol>
-    </aside>
+      <div id="panelHistory" class="panel">
+        <div id="historyList"></div>
+      </div>
 
-    <section class="mapWrap">
-      <div id="map"></div>
-    </section>
-  </main>
+      <div id="panelFavs" class="panel">
+        <div id="favList"></div>
+      </div>
+    </div>
+  </div>
 
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVUuZoOvpy8g01RbOrh5R9ZtV-sxUBAkU&libraries=places,geometry"></script>
-  <script type="module" src="./assets/js/app.js"></script>
+  <div id="mapWrap">
+    <div id="map"></div>
+
+   <div id="mobileZoom" class="mobile-zoom">
+  <button id="zoomInBtn" type="button" aria-label="Zoom in">+</button>
+  <button id="zoomOutBtn" type="button" aria-label="Zoom out">−</button>
+  <button id="grabBtn" type="button" aria-label="Grab (1 deget)">🖐️</button>
+</div>
+
+
+    <div id="sv-panel">
+      <button id="sv-close" onclick="document.getElementById('sv-panel').style.display='none'">X</button>
+      <div id="sv-container"></div>
+      <div id="sv-label">Street View Interactiv</div>
+    </div>
+  </div>
+
+  <script type="module" src="./assets/firebase.js"></script>
+  <script src="./assets/app.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCvbL5aBjXtO-_61bYgMKj2G9o3sEtztGY&libraries=places,geometry&callback=initMap" async defer></script>
 </body>
 </html>
