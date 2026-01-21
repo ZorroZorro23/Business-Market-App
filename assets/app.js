@@ -1,38 +1,21 @@
-let map
-let circle
-let placesService
+let map, circle, service, directionsService, directionsRenderer
+let miniStreetView
 let markers = []
-let streetView
-
 let userPos = { lat: 44.4268, lng: 26.1025 }
-let circleCenter = null
-let circleRadius = 1500
 
-let lastResults = []
-let favorites = []
-let history = []
+let currentSelectedDest = null
+let currentSelectedMsgId = null
 
-let activeTab = "results"
-
-const LS_KEY = "atlasgo_state_v5"
+const LS_FAVS = "atlasgo_favs_v2"
+const LS_HISTORY_RESULTS = "atlasgo_results_history_v1"
+const LS_STATE = "atlasgo_last_state_v2"
 
 const NOIMG_DATA_URL = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60">' +
   '<rect width="100%" height="100%" fill="#2b2b2b"/>' +
-  '<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#9a9a9a" font-family="Arial" font-size="10">' +
-  "no image" +
-  "</text></svg>"
+  '<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#9a9a9a" font-family="Arial" font-size="10">NoImg</text>' +
+  "</svg>"
 )
-
-const CATEGORY_PRESETS = {
-  convenience_store: { label: "Magazine / Minimarket", types: ["convenience_store", "grocery_or_supermarket", "supermarket"] },
-  gas_station: { label: "Benzinarii", types: ["gas_station"] },
-  restaurant_cafe: { label: "Restaurante", types: ["restaurant", "cafe"] },
-  tourist_attraction: { label: "Turism", types: ["tourist_attraction", "museum", "point_of_interest"] },
-  spa_park: { label: "Relaxare", types: ["spa", "park"] },
-  pharmacy: { label: "Farmacii", types: ["pharmacy"] },
-  gym: { label: "Sala Fitness", types: ["gym"] }
-}
 
 function byId(id) { return document.getElementById(id) }
 
@@ -40,101 +23,447 @@ function safeParseJSON(s, fallback) {
   try { return JSON.parse(s) } catch { return fallback }
 }
 
-function clamp(n, a, b) { return Math.min(b, Math.max(a, n)) }
-
-function nowIso() { return new Date().toISOString() }
-
-function fmtMeters(m) {
-  if (!Number.isFinite(m)) return "-"
-  if (m < 1000) return `${Math.round(m)}m`
-  return `${(m / 1000).toFixed(1)}km`
+function escapeHtml(s) {
+  const str = String(s == null ? "" : s)
+  return str
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
 }
 
-function fmtRating(r) {
-  if (!Number.isFinite(r)) return "-"
-  return r.toFixed(1)
+function getAuthUser() {
+  return window.__authUser || null
 }
 
-function loadState() {
-  const data = safeParseJSON(localStorage.getItem(LS_KEY), null)
-  if (!data) return
+function requireLoginOrWarn() {
+  const u = getAuthUser()
+  if (!u) {
+    alert("Trebuie să fii autentificat ca să folosești Favorite și Istoric.")
+    return null
+  }
+  return u
+}
 
-  if (data.userPos && Number.isFinite(data.userPos.lat) && Number.isFinite(data.userPos.lng)) userPos = data.userPos
-  if (data.circleCenter && Number.isFinite(data.circleCenter.lat) && Number.isFinite(data.circleCenter.lng)) circleCenter = data.circleCenter
-  if (Number.isFinite(data.circleRadius)) circleRadius = clamp(Number(data.circleRadius), 200, 20000)
+function updateAuthButton() {
+  const btn = byId("authBtn")
+  if (!btn) return
+  const u = getAuthUser()
+  if (u) {
+    btn.textContent = "Logout"
+    btn.onclick = () => {
+      if (window.logout) window.logout()
+      else location.href = "./login.html"
+    }
+  } else {
+    btn.textContent = "Login"
+    btn.onclick = () => { location.href = "./login.html" }
+  }
+}
 
-  if (Array.isArray(data.favorites)) favorites = data.favorites
-  if (Array.isArray(data.history)) history = data.history
+window.addEventListener("auth-changed", () => {
+  updateAuthButton()
+  renderFavs()
+  renderHistory()
+})
 
-  if (typeof data.activeTab === "string") activeTab = data.activeTab
+function setTab(name) {
+  const tabs = [
+    { btn: "tabResults", panel: "panelResults", name: "results" },
+    { btn: "tabHistory", panel: "panelHistory", name: "history" },
+    { btn: "tabFavs", panel: "panelFavs", name: "favs" }
+  ]
 
-  const ui = data.ui || {}
-  if (byId("cat") && typeof ui.cat === "string") byId("cat").value = ui.cat
-  if (byId("sort") && typeof ui.sort === "string") byId("sort").value = ui.sort
-  if (byId("travelMode") && typeof ui.travelMode === "string") byId("travelMode").value = ui.travelMode
-  if (byId("city") && typeof ui.city === "string") byId("city").value = ui.city
+  tabs.forEach(t => {
+    const b = byId(t.btn)
+    const p = byId(t.panel)
+    if (b) b.classList.toggle("active", t.name === name)
+    if (p) p.classList.toggle("active", t.name === name)
+  })
+}
+
+function readFavs() {
+  const f = safeParseJSON(localStorage.getItem(LS_FAVS), {})
+  return f && typeof f === "object" ? f : {}
+}
+
+function writeFavs(obj) {
+  const safeObj = obj && typeof obj === "object" ? obj : {}
+  localStorage.setItem(LS_FAVS, JSON.stringify(safeObj))
+}
+
+function isFav(placeId) {
+  const favs = readFavs()
+  return Boolean(favs[placeId])
+}
+
+function toggleFav(placeObj) {
+  const u = requireLoginOrWarn()
+  if (!u) return
+  const placeId = placeObj.place_id
+  if (!placeId) return
+
+  const favs = readFavs()
+  if (favs[placeId]) {
+    delete favs[placeId]
+  } else {
+    favs[placeId] = {
+      place_id: placeId,
+      name: placeObj.name || "",
+      vicinity: placeObj.vicinity || "",
+      rating: placeObj.rating || 0,
+      dist: Math.round(placeObj.realDist || 0),
+      lat: placeObj.geometry && placeObj.geometry.location ? placeObj.geometry.location.lat() : null,
+      lng: placeObj.geometry && placeObj.geometry.location ? placeObj.geometry.location.lng() : null,
+      photo: (placeObj.photos && placeObj.photos.length) ? placeObj.photos[0].getUrl({ maxWidth: 120 }) : "",
+      ts: Date.now()
+    }
+  }
+
+  writeFavs(favs)
+  const btn = document.querySelector(`[data-fav-id="${placeId}"]`)
+  if (btn) btn.textContent = favs[placeId] ? "★" : "☆"
+  renderFavs()
+}
+
+function removeFavById(placeId) {
+  const u = requireLoginOrWarn()
+  if (!u) return
+  const favs = readFavs()
+  if (!favs[placeId]) return
+  delete favs[placeId]
+  writeFavs(favs)
+  renderFavs()
+  const btn = document.querySelector(`[data-fav-id="${placeId}"]`)
+  if (btn) btn.textContent = "☆"
+}
+
+function renderFavs() {
+  const list = byId("favList")
+  if (!list) return
+
+  const u = getAuthUser()
+  if (!u) {
+    list.innerHTML = '<div class="hint">Autentifică-te ca să vezi lista de favorite.</div>'
+    return
+  }
+
+  const favs = readFavs()
+  const arr = Object.values(favs).sort((a, b) => (b.ts || 0) - (a.ts || 0))
+
+  if (!arr.length) {
+    list.innerHTML = '<div class="hint">Nu ai favorite încă. Apasă pe ★ la un rezultat ca să îl salvezi.</div>'
+    return
+  }
+
+  list.innerHTML = ""
+  arr.forEach((f) => {
+    const card = document.createElement("div")
+    card.className = "card"
+    card.onclick = () => {
+      if (f.lat == null || f.lng == null) return
+      selectSavedPlace(f)
+      setTab("results")
+    }
+
+    const thumb = f.photo ? f.photo : NOIMG_DATA_URL
+    card.innerHTML = `
+      <img src="${thumb}" class="place-img">
+      <div class="place-info">
+        <div style="position:absolute; right:10px; top:8px; font-size:11px; color:#f1c40f;">★</div>
+        <b>${escapeHtml(f.name)}</b><br>
+        <span style="color:#f1c40f">${(f.rating || 0).toFixed ? (f.rating || 0).toFixed(1) : (f.rating || 0)} ★</span> |
+        <span style="color:#aaa; font-size:11px">${f.dist || 0}m</span>
+        <div class="mini-muted" style="margin-top:4px;">${escapeHtml(f.vicinity || "")}</div>
+      </div>
+      <div class="mini-action" title="Șterge">🗑</div>
+    `
+
+    const del = card.querySelector(".mini-action")
+    del.onclick = (ev) => {
+      ev.stopPropagation()
+      removeFavById(f.place_id)
+    }
+
+    list.appendChild(card)
+  })
+}
+
+function readResultsHistory() {
+  const h = safeParseJSON(localStorage.getItem(LS_HISTORY_RESULTS), [])
+  return Array.isArray(h) ? h : []
+}
+
+function writeResultsHistory(arr) {
+  const safeArr = Array.isArray(arr) ? arr : []
+  localStorage.setItem(LS_HISTORY_RESULTS, JSON.stringify(safeArr))
+}
+
+function historyKey(entry) {
+  const city = (entry.city || "").trim().toLowerCase()
+  return [
+    city,
+    entry.cat || "",
+    String(entry.rad || ""),
+    entry.sort || "",
+    entry.mode || ""
+  ].join("|")
+}
+
+function saveResultsToHistory(payload) {
+  const u = requireLoginOrWarn()
+  if (!u) return
+
+  const arr = readResultsHistory()
+  const key = historyKey(payload)
+
+  const filtered = arr.filter(x => historyKey(x) !== key)
+  filtered.unshift(payload)
+  writeResultsHistory(filtered.slice(0, 30))
+  renderHistory()
+}
+
+function renderHistory() {
+  const list = byId("historyList")
+  if (!list) return
+
+  const u = getAuthUser()
+  if (!u) {
+    list.innerHTML = '<div class="hint">Autentifică-te ca să vezi istoricul scanărilor.</div>'
+    return
+  }
+
+  const arr = readResultsHistory()
+  if (!arr.length) {
+    list.innerHTML = '<div class="hint">Nu ai istoric. Apasă Scan ca să salvezi o sesiune.</div>'
+    return
+  }
+
+  list.innerHTML = ""
+  arr.forEach((entry) => {
+    const card = document.createElement("div")
+    card.className = "card"
+    card.style.cursor = "default"
+
+    const when = new Date(entry.ts || Date.now()).toLocaleString()
+    const label = escapeHtml(entry.catLabel || entry.cat || "Categorie")
+    const city = escapeHtml(entry.city || "")
+    const rad = Number(entry.rad || 0)
+    const count = Number(entry.count || 0)
+    const mode = escapeHtml(entry.mode || "")
+
+    card.innerHTML = `
+      <div class="place-info" style="padding-right:0">
+        <b>${label}</b> <span style="color:#888; font-size:11px">• ${rad}m • ${mode}</span><br>
+        <span style="color:#aaa; font-size:11px">${city ? city + " • " : ""}${count} rezultate • ${when}</span>
+        <div style="margin-top:8px; display:flex; gap:8px;">
+          <button class="btn-mini" style="width:120px;">Reia</button>
+        </div>
+      </div>
+    `
+
+    const btn = card.querySelector(".btn-mini")
+    btn.onclick = () => replayHistory(entry)
+
+    list.appendChild(card)
+  })
 }
 
 function saveState() {
-  const ui = {
-    cat: byId("cat") ? byId("cat").value : null,
-    sort: byId("sort") ? byId("sort").value : null,
-    travelMode: byId("travelMode") ? byId("travelMode").value : null,
-    city: byId("city") ? byId("city").value : null
+  const state = {
+    city: byId("city") ? byId("city").value : "",
+    cat: byId("cat") ? byId("cat").value : "",
+    travelMode: byId("travelMode") ? byId("travelMode").value : "",
+    sort: byId("sort") ? byId("sort").value : "",
+    rad: byId("rad") ? parseInt(byId("rad").value, 10) : 1500
+  }
+  localStorage.setItem(LS_STATE, JSON.stringify(state))
+}
+
+function loadState() {
+  const state = safeParseJSON(localStorage.getItem(LS_STATE), null)
+  if (!state) return
+  if (byId("city") && typeof state.city === "string") byId("city").value = state.city
+  if (byId("cat") && typeof state.cat === "string") byId("cat").value = state.cat
+  if (byId("travelMode") && typeof state.travelMode === "string") byId("travelMode").value = state.travelMode
+  if (byId("sort") && typeof state.sort === "string") byId("sort").value = state.sort
+  if (byId("rad") && Number.isFinite(state.rad)) byId("rad").value = String(state.rad)
+}
+
+function labelForCategoryValue(v) {
+  const map = {
+    "market": "Market / Minimarket",
+    "gas": "Benzinării",
+    "restaurant": "Restaurant / Cafea",
+    "tourism": "Turism",
+    "spa": "Spa / Relaxare",
+    "pharmacy": "Farmacie",
+    "gym": "Sală Fitness"
+  }
+  return map[v] || v
+}
+
+function getCategoryKeywords(v) {
+  const map = {
+    "market": ["market", "minimarket", "convenience store", "grocery", "supermarket"],
+    "gas": ["gas station", "fuel", "petrol"],
+    "restaurant": ["restaurant", "cafe", "coffee"],
+    "tourism": ["tourist attraction", "museum", "landmark"],
+    "spa": ["spa", "massage", "wellness"],
+    "pharmacy": ["pharmacy", "drugstore"],
+    "gym": ["gym", "fitness"]
+  }
+  return map[v] || [v]
+}
+
+function iconForMode(m) {
+  if (m === "DRIVING") return "🚗"
+  if (m === "WALKING") return "🚶"
+  if (m === "BICYCLING") return "🚲"
+  return "🚌"
+}
+
+function directionsRequest(origin, dest, mode) {
+  return {
+    origin: origin,
+    destination: dest,
+    travelMode: google.maps.TravelMode[mode]
+  }
+}
+
+function setGrabEnabled(v) {
+  const btn = byId("grabBtn")
+  if (btn) btn.classList.toggle("active", Boolean(v))
+  map.setOptions({ gestureHandling: v ? "greedy" : "cooperative" })
+  localStorage.setItem("atlasgo_grab_enabled", v ? "1" : "0")
+}
+
+function initMap() {
+  loadState()
+
+  map = new google.maps.Map(byId("map"), {
+    center: userPos,
+    zoom: 13,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    gestureHandling: "greedy"
+  })
+
+  updateAuthButton()
+
+  const grabEnabled = localStorage.getItem("atlasgo_grab_enabled") !== "0"
+  const controlDiv = document.createElement("div")
+  controlDiv.className = "grab-control"
+  const button = document.createElement("button")
+  button.id = "grabBtn"
+  button.className = "grab-btn"
+  button.title = "Grab (1 deget pe telefon)"
+  button.innerText = "🖐️"
+  button.addEventListener("click", () => setGrabEnabled(!button.classList.contains("active")))
+  controlDiv.appendChild(button)
+  map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(controlDiv)
+  setGrabEnabled(grabEnabled)
+
+  new google.maps.TransitLayer().setMap(map)
+
+  directionsService = new google.maps.DirectionsService()
+  directionsRenderer = new google.maps.DirectionsRenderer({
+    map: map,
+    suppressMarkers: true,
+    polylineOptions: { strokeColor: "#3b82f6", strokeWeight: 6, strokeOpacity: 0.7 }
+  })
+
+  miniStreetView = new google.maps.StreetViewPanorama(
+    byId("sv-container"),
+    {
+      position: userPos,
+      pov: { heading: 34, pitch: 10 },
+      visible: true,
+      disableDefaultUI: false,
+      zoomControl: true,
+      panControl: true
+    }
+  )
+
+  const radius = byId("rad") ? parseInt(byId("rad").value, 10) : 1500
+
+  circle = new google.maps.Circle({
+    map: map,
+    center: userPos,
+    radius: radius || 1500,
+    fillColor: "#3b82f6",
+    fillOpacity: 0.1,
+    strokeColor: "#3b82f6",
+    strokeWeight: 2,
+    editable: true,
+    draggable: true
+  })
+
+  circle.addListener("center_changed", () => { userPos = circle.getCenter() })
+
+  service = new google.maps.places.PlacesService(map)
+
+  const cityInput = byId("city")
+  if (cityInput) {
+    const ac = new google.maps.places.Autocomplete(cityInput)
+    ac.bindTo("bounds", map)
+    ac.addListener("place_changed", () => {
+      const p = ac.getPlace()
+      if (p.geometry) {
+        userPos = p.geometry.location
+        updateMapCenter()
+      }
+    })
   }
 
-  const data = {
-    userPos,
-    circleCenter,
-    circleRadius,
-    favorites,
-    history,
-    activeTab,
-    ui
+  const elements = ["city", "cat", "travelMode", "sort", "rad"]
+  elements.forEach((id) => {
+    const el = byId(id)
+    if (!el) return
+    el.addEventListener("change", saveState)
+    el.addEventListener("input", saveState)
+  })
+}
+
+window.initMap = initMap
+
+function locateUser() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        userPos = { lat: p.coords.latitude, lng: p.coords.longitude }
+        updateMapCenter()
+      },
+      () => { alert("Eroare GPS.") }
+    )
+  } else {
+    alert("Fara suport GPS.")
   }
-
-  localStorage.setItem(LS_KEY, JSON.stringify(data))
 }
 
-function setCount(n) {
-  const el = byId("count")
-  if (el) el.textContent = String(n)
+function updateMapCenter() {
+  if (!map || !circle) return
+  map.setCenter(userPos)
+  map.setZoom(15)
+  circle.setCenter(userPos)
 }
 
-function setRadiusUI(meters) {
-  const rVal = byId("rVal")
-  if (rVal) rVal.textContent = String(Math.round(meters))
-  const rad = byId("rad")
-  if (rad) rad.value = String(Math.round(meters))
-}
-
-function setActiveTabUI(tab) {
-  activeTab = tab
-  const tabResults = byId("tabResults")
-  const tabHistory = byId("tabHistory")
-  const tabFavs = byId("tabFavs")
-  const panelResults = byId("panelResults")
-  const panelHistory = byId("panelHistory")
-  const panelFavs = byId("panelFavs")
-
-  if (tabResults) tabResults.classList.toggle("active", tab === "results")
-  if (tabHistory) tabHistory.classList.toggle("active", tab === "history")
-  if (tabFavs) tabFavs.classList.toggle("active", tab === "favorites")
-
-  if (panelResults) panelResults.classList.toggle("active", tab === "results")
-  if (panelHistory) panelHistory.classList.toggle("active", tab === "history")
-  if (panelFavs) panelFavs.classList.toggle("active", tab === "favorites")
+function updateRouteMode() {
   saveState()
+  if (currentSelectedDest && currentSelectedMsgId) {
+    calculateAndDisplayRoute(currentSelectedDest, currentSelectedMsgId)
+  }
 }
 
-function initTabs() {
-  const tabResults = byId("tabResults")
-  const tabHistory = byId("tabHistory")
-  const tabFavs = byId("tabFavs")
-  if (tabResults) tabResults.onclick = () => { setActiveTabUI("results"); renderActiveTab() }
-  if (tabHistory) tabHistory.onclick = () => { setActiveTabUI("history"); renderActiveTab() }
-  if (tabFavs) tabFavs.onclick = () => { setActiveTabUI("favorites"); renderActiveTab() }
-  setActiveTabUI(activeTab === "favorites" ? "favorites" : (activeTab === "history" ? "history" : "results"))
+function nearbySearchAsync(req) {
+  return new Promise((resolve) => {
+    service.nearbySearch(req, (res, status) => {
+      if (status === "OK" && res) resolve(res)
+      else resolve([])
+    })
+  })
 }
 
 function clearMarkers() {
@@ -142,569 +471,271 @@ function clearMarkers() {
   markers = []
 }
 
-function focusOn(lat, lng, zoom) {
-  if (!map) return
-  map.panTo({ lat, lng })
-  if (Number.isFinite(zoom)) map.setZoom(zoom)
-}
-
-function openStreetView(lat, lng) {
-  const panel = byId("sv-panel")
-  const container = byId("sv-container")
-  if (!panel || !container) return
-
-  if (!streetView) {
-    streetView = new google.maps.StreetViewPanorama(container, {
-      position: { lat, lng },
-      pov: { heading: 0, pitch: 0 },
-      visible: true,
-      fullscreenControl: false,
-      addressControl: true,
-      motionTracking: false,
-      motionTrackingControl: false
-    })
-  }
-
-  panel.style.display = "block"
-  streetView.setPosition({ lat, lng })
-  streetView.setVisible(true)
-}
-
-function ensureCloseStreetViewWiring() {
-  const closeBtn = byId("sv-close")
-  if (!closeBtn) return
-  closeBtn.onclick = () => {
-    const panel = byId("sv-panel")
-    if (panel) panel.style.display = "none"
-    if (streetView) streetView.setVisible(false)
-  }
-}
-
-function getSelectedTravelMode() {
-  const el = byId("travelMode")
-  if (!el) return "TRANSIT"
-  const v = String(el.value || "TRANSIT").toUpperCase()
-  if (v === "DRIVING" || v === "WALKING" || v === "BICYCLING" || v === "TRANSIT") return v
-  return "TRANSIT"
-}
-
-function getSelectedSortMode() {
-  const el = byId("sort")
-  const v = el ? String(el.value || "dist") : "dist"
-  if (v === "rate" || v === "best" || v === "dist") return v
-  return "dist"
-}
-
-function getSelectedCategoryTypes() {
-  const el = byId("cat")
-  const raw = el ? String(el.value || "convenience_store") : "convenience_store"
-  if (raw.includes("|")) return raw.split("|").map(x => x.trim()).filter(Boolean)
-  const presetKey = raw
-  if (CATEGORY_PRESETS[presetKey]) return CATEGORY_PRESETS[presetKey].types
-  return [raw]
-}
-
-function computeDistanceMeters(a, b) {
-  try {
-    const p1 = new google.maps.LatLng(a.lat, a.lng)
-    const p2 = new google.maps.LatLng(b.lat, b.lng)
-    return google.maps.geometry.spherical.computeDistanceBetween(p1, p2)
-  } catch {
-    return Infinity
-  }
-}
-
-function scoreBestMatch(p) {
-  const r = Number.isFinite(p.rating) ? p.rating : 0
-  const d = Number.isFinite(p.distance_m) ? p.distance_m : 999999
-  const dScore = 1 / (1 + d / 250)
-  const rScore = Math.min(5, Math.max(0, r)) / 5
-  return (0.55 * rScore) + (0.45 * dScore)
-}
-
-function normalizePlace(p) {
-  const loc = p.geometry && p.geometry.location
-  const lat = loc ? (typeof loc.lat === "function" ? loc.lat() : loc.lat) : null
-  const lng = loc ? (typeof loc.lng === "function" ? loc.lng() : loc.lng) : null
-  return {
-    place_id: p.place_id,
-    name: p.name || "",
-    rating: Number(p.rating || 0),
-    user_ratings_total: Number(p.user_ratings_total || 0),
-    vicinity: p.vicinity || "",
-    types: Array.isArray(p.types) ? p.types : [],
-    lat,
-    lng,
-    photos: Array.isArray(p.photos) ? p.photos.map(ph => {
-      try { return ph.getUrl({ maxWidth: 300, maxHeight: 200 }) } catch { return NOIMG_DATA_URL }
-    }) : []
-  }
-}
-
-function isFavorite(placeId) {
-  return favorites.some(x => x && x.place_id === placeId)
-}
-
-function toggleFavorite(p) {
-  const idx = favorites.findIndex(x => x && x.place_id === p.place_id)
-  if (idx >= 0) favorites.splice(idx, 1)
-  else favorites.unshift({ ...p, savedAt: nowIso() })
-  saveState()
-  renderActiveTab()
-}
-
-function renderCard(p) {
-  const card = document.createElement("div")
-  card.className = "card"
-
-  const img = document.createElement("img")
-  img.className = "place-img"
-  img.src = (p.photos && p.photos[0]) ? p.photos[0] : NOIMG_DATA_URL
-  img.alt = p.name || "place"
-  card.appendChild(img)
-
-  const info = document.createElement("div")
-  info.className = "place-info"
-
-  const title = document.createElement("div")
-  title.style.fontWeight = "700"
-  title.style.fontSize = "13px"
-  title.textContent = p.name || "Loc fără nume"
-  info.appendChild(title)
-
-  const meta = document.createElement("div")
-  meta.style.fontSize = "11px"
-  meta.style.color = "#aaa"
-  meta.style.marginTop = "3px"
-  meta.textContent = p.vicinity || ""
-  info.appendChild(meta)
-
-  const line = document.createElement("div")
-  line.style.display = "flex"
-  line.style.justifyContent = "space-between"
-  line.style.gap = "8px"
-  line.style.marginTop = "6px"
-  line.style.fontSize = "11px"
-
-  const left = document.createElement("div")
-  left.textContent = `${fmtRating(p.rating)} ★`
-  const right = document.createElement("div")
-  right.textContent = fmtMeters(p.distance_m)
-  line.appendChild(left)
-  line.appendChild(right)
-  info.appendChild(line)
-
-  card.appendChild(info)
-
-  const favBtn = document.createElement("div")
-  favBtn.className = "fav-btn"
-  favBtn.textContent = isFavorite(p.place_id) ? "★" : "☆"
-  favBtn.onclick = (e) => {
-    e.stopPropagation()
-    toggleFavorite(p)
-  }
-  card.appendChild(favBtn)
-
-  const svBtn = document.createElement("div")
-  svBtn.className = "mini-action"
-  svBtn.textContent = "👁️"
-  svBtn.title = "Street View"
-  svBtn.onclick = (e) => {
-    e.stopPropagation()
-    if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) openStreetView(p.lat, p.lng)
-  }
-  card.appendChild(svBtn)
-
-  card.onclick = () => {
-    if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
-      focusOn(p.lat, p.lng, 15)
-    }
-  }
-
-  return card
-}
-
-function renderResultsList(listEl, places) {
-  if (!listEl) return
-  listEl.innerHTML = ""
-  places.forEach((p, idx) => {
-    const card = renderCard(p)
-    if (idx === 0) {
-      const badge = document.createElement("div")
-      badge.className = "best-badge"
-      badge.textContent = "BEST"
-      card.appendChild(badge)
-    }
-    listEl.appendChild(card)
-  })
-}
-
-function renderFavorites() {
-  const list = byId("favList")
-  if (!list) return
-  renderResultsList(list, favorites.map(x => ({ ...x })))
-}
-
-function renderHistory() {
-  const list = byId("historyList")
+function renderResultsFromPlaces(places) {
+  const list = byId("resultsList")
   if (!list) return
   list.innerHTML = ""
 
-  history.forEach(h => {
-    const div = document.createElement("div")
-    div.className = "card"
-    div.style.cursor = "default"
+  clearMarkers()
 
-    const info = document.createElement("div")
-    info.className = "place-info"
-    info.style.paddingRight = "0px"
+  if (!places || !places.length) {
+    list.innerHTML = '<div class="hint">Niciun rezultat.</div>'
+    byId("count").innerText = "0"
+    return
+  }
 
-    const title = document.createElement("div")
-    title.style.fontWeight = "700"
-    title.style.fontSize = "12px"
+  byId("count").innerText = String(places.length)
 
-    const catLabel = (() => {
-      const raw = String(h.catRaw || "")
-      if (CATEGORY_PRESETS[raw]) return CATEGORY_PRESETS[raw].label
-      if (raw.includes("|")) return "Categorie mixtă"
-      return raw || "Categorie"
-    })()
-
-    title.textContent = `${catLabel} • ${fmtMeters(h.radius)} • ${h.travelMode || "TRANSIT"}`
-    info.appendChild(title)
-
-    const meta = document.createElement("div")
-    meta.style.fontSize = "11px"
-    meta.style.color = "#aaa"
-    meta.style.marginTop = "4px"
-    meta.textContent = `${h.count || 0} rezultate • ${new Date(h.createdAt).toLocaleString()}`
-    info.appendChild(meta)
-
-    const btn = document.createElement("button")
-    btn.textContent = "Reia"
-    btn.style.marginTop = "8px"
-    btn.style.width = "120px"
-    btn.style.padding = "6px 10px"
-    btn.style.borderRadius = "8px"
-    btn.style.border = "1px solid #3b82f6"
-    btn.style.background = "transparent"
-    btn.style.color = "#3b82f6"
-    btn.style.cursor = "pointer"
-
-    btn.onclick = () => {
-      if (byId("cat") && typeof h.catRaw === "string") byId("cat").value = h.catRaw
-      if (byId("sort") && typeof h.sortMode === "string") byId("sort").value = h.sortMode
-      if (byId("travelMode") && typeof h.travelMode === "string") byId("travelMode").value = h.travelMode
-      circleRadius = clamp(Number(h.radius || circleRadius), 200, 20000)
-      setRadiusUI(circleRadius)
-      if (circle) circle.setRadius(circleRadius)
-
-      if (h.center && Number.isFinite(h.center.lat) && Number.isFinite(h.center.lng)) {
-        userPos = { ...h.center }
-        circleCenter = { ...h.center }
-        if (circle) circle.setCenter(circleCenter)
-        focusOn(circleCenter.lat, circleCenter.lng, 13)
-      }
-
-      saveState()
-      setActiveTabUI("results")
-      runScan()
+  places.forEach((p, idx) => {
+    if (p.lat != null && p.lng != null) {
+      const pos = { lat: p.lat, lng: p.lng }
+      markers.push(new google.maps.Marker({ map: map, position: pos, title: p.name || "" }))
     }
 
-    info.appendChild(btn)
-    div.appendChild(info)
-    list.appendChild(div)
+    const badge = idx === 0 ? '<div class="best-badge">BEST</div>' : ""
+    const thumbUrl = p.photo ? p.photo : NOIMG_DATA_URL
+    const favSymbol = (p.place_id && isFav(p.place_id)) ? "★" : "☆"
+    const safePlaceId = (p.place_id || "").replace(/'/g, "")
+
+    const card = document.createElement("div")
+    card.className = "card"
+    card.onclick = () => {
+      if (p.lat == null || p.lng == null) return
+      const dest = { lat: p.lat, lng: p.lng }
+      currentSelectedDest = dest
+      currentSelectedMsgId = "route-msg-" + idx
+
+      const panel = byId("sv-panel")
+      if (panel) panel.style.display = "block"
+      if (miniStreetView) miniStreetView.setPosition(dest)
+
+      const svService = new google.maps.StreetViewService()
+      svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
+        if (status !== "OK" && panel) panel.style.display = "none"
+      })
+
+      calculateAndDisplayRoute(dest, currentSelectedMsgId)
+      map.setCenter(dest)
+      map.setZoom(16)
+    }
+
+    card.innerHTML = `
+      ${badge}
+      <img src="${thumbUrl}" class="place-img">
+      <div class="place-info">
+        <b>${escapeHtml(p.name || "")}</b><br>
+        <span style="color:#f1c40f">${escapeHtml(String(p.rating || "-"))} ★</span> |
+        <span style="color:#aaa; font-size:11px">${escapeHtml(String(p.dist || 0))}m</span>
+        <div class="mini-muted" style="margin-top:4px;">${escapeHtml(p.vicinity || "")}</div>
+        <div id="route-msg-${idx}" class="route-info"></div>
+        <div id="steps-${idx}" class="transit-steps"></div>
+      </div>
+      <div class="fav-btn" data-fav-id="${safePlaceId}" title="Favorite">${favSymbol}</div>
+      <div class="mini-action" title="Street View">👁️</div>
+    `
+
+    const favBtn = card.querySelector(".fav-btn")
+    favBtn.onclick = (ev) => {
+      ev.stopPropagation()
+      toggleFav({
+        place_id: p.place_id,
+        name: p.name,
+        vicinity: p.vicinity,
+        rating: Number(p.rating) || 0,
+        realDist: Number(p.dist) || 0,
+        geometry: { location: new google.maps.LatLng(p.lat, p.lng) },
+        photos: p.photo ? [{ getUrl: () => p.photo }] : []
+      })
+    }
+
+    const svBtn = card.querySelector(".mini-action")
+    svBtn.onclick = (ev) => {
+      ev.stopPropagation()
+      if (p.lat == null || p.lng == null) return
+      const dest = { lat: p.lat, lng: p.lng }
+      const panel = byId("sv-panel")
+      if (panel) panel.style.display = "block"
+      if (miniStreetView) miniStreetView.setPosition(dest)
+      map.setCenter(dest)
+      map.setZoom(16)
+    }
+
+    list.appendChild(card)
   })
 }
 
-function renderActiveTab() {
-  if (activeTab === "favorites") renderFavorites()
-  else if (activeTab === "history") renderHistory()
-}
+function replayHistory(entry) {
+  const u = requireLoginOrWarn()
+  if (!u) return
 
-function pushHistoryEntry(entry) {
-  history.unshift(entry)
-  history = history.slice(0, 50)
+  if (byId("city")) byId("city").value = entry.city || ""
+  if (byId("cat")) byId("cat").value = entry.cat || ""
+  if (byId("travelMode")) byId("travelMode").value = entry.mode || "TRANSIT"
+  if (byId("sort")) byId("sort").value = entry.sort || "dist"
+  if (byId("rad")) byId("rad").value = String(entry.rad || 1500)
+
   saveState()
-}
 
-async function geocodeCityIfNeeded() {
-  const input = byId("city")
-  if (!input) return
-  const q = String(input.value || "").trim()
-  if (!q) return
+  directionsRenderer.setDirections({ routes: [] })
+  byId("sv-panel").style.display = "none"
+  currentSelectedDest = null
+  currentSelectedMsgId = null
 
-  const geocoder = new google.maps.Geocoder()
-  const res = await new Promise(resolve => {
-    geocoder.geocode({ address: q }, (results, status) => {
-      if (status === "OK" && results && results[0] && results[0].geometry && results[0].geometry.location) {
-        resolve(results[0].geometry.location)
-      } else resolve(null)
-    })
-  })
+  renderResultsFromPlaces(entry.results)
 
-  if (!res) return
-  const lat = res.lat()
-  const lng = res.lng()
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
-
-  userPos = { lat, lng }
-  circleCenter = { lat, lng }
-  if (circle) circle.setCenter(circleCenter)
-  focusOn(lat, lng, 13)
-  saveState()
-}
-
-function locateUser() {
-  if (!navigator.geolocation) return
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-      if (map) focusOn(userPos.lat, userPos.lng, 13)
-      if (circle) circle.setCenter(userPos)
-      circleCenter = { ...userPos }
-      saveState()
-    },
-    () => {},
-    { enableHighAccuracy: true, timeout: 8000 }
-  )
-}
-
-function updateRouteMode() {
-  saveState()
-}
-
-function buildNearbyRequest() {
-  const center = circle ? circle.getCenter() : new google.maps.LatLng(userPos.lat, userPos.lng)
-  const radius = circle ? circle.getRadius() : circleRadius
-  const types = getSelectedCategoryTypes()
-  return { center, radius, types }
-}
-
-function nearbySearchOneType(type, center, radius) {
-  if (!placesService) placesService = new google.maps.places.PlacesService(map)
-  const req = { location: center, radius, type }
-  return new Promise(resolve => {
-    placesService.nearbySearch(req, (results, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && Array.isArray(results)) resolve(results)
-      else resolve([])
-    })
-  })
-}
-
-async function fetchPlacesMultiType(center, radius, types) {
-  const all = []
-  for (const t of types) {
-    const res = await nearbySearchOneType(t, center, radius)
-    res.forEach(x => all.push(x))
+  if (entry.center && entry.center.lat != null && entry.center.lng != null) {
+    const center = { lat: entry.center.lat, lng: entry.center.lng }
+    map.setCenter(center)
+    map.setZoom(14)
+    circle.setCenter(center)
+    circle.setRadius(entry.rad || circle.getRadius())
   }
-  const seen = new Set()
-  const dedup = []
-  all.forEach(p => {
-    if (!p || !p.place_id) return
-    if (seen.has(p.place_id)) return
-    seen.add(p.place_id)
-    dedup.push(p)
+}
+
+function selectSavedPlace(f) {
+  if (f.lat == null || f.lng == null) return
+  const dest = { lat: f.lat, lng: f.lng }
+  currentSelectedDest = dest
+  currentSelectedMsgId = "route-msg-fav"
+
+  directionsRenderer.setDirections({ routes: [] })
+  byId("sv-panel").style.display = "block"
+  miniStreetView.setPosition(dest)
+
+  const svService = new google.maps.StreetViewService()
+  svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
+    if (status !== "OK") byId("sv-panel").style.display = "none"
   })
-  return dedup
+
+  calculateAndDisplayRoute(dest, currentSelectedMsgId)
+  map.setCenter(dest)
+  map.setZoom(16)
 }
 
 async function runScan() {
-  if (!map || !circle) return
+  const r = parseInt(byId("rad").value, 10)
+  const cRaw = byId("cat").value
+  const s = byId("sort").value
+  const mode = byId("travelMode").value
+  const cityText = byId("city").value || ""
 
-  await geocodeCityIfNeeded()
+  circle.setRadius(r)
+  directionsRenderer.setDirections({ routes: [] })
+  byId("sv-panel").style.display = "none"
+  currentSelectedDest = null
+  currentSelectedMsgId = null
 
-  const { center, radius, types } = buildNearbyRequest()
-  const sortMode = getSelectedSortMode()
-  const travelMode = getSelectedTravelMode()
-  const catRaw = byId("cat") ? String(byId("cat").value) : "convenience_store"
+  const center = circle.getCenter()
+  const cats = getCategoryKeywords(cRaw)
 
-  const results = await fetchPlacesMultiType(center, radius, types)
-  const compact = results.map(normalizePlace)
-
-  const c = { lat: center.lat(), lng: center.lng() }
-  compact.forEach(p => {
-    p.distance_m = (Number.isFinite(p.lat) && Number.isFinite(p.lng)) ? computeDistanceMeters(c, p) : Infinity
-    p.__bestScore = scoreBestMatch(p)
-  })
-
-  if (sortMode === "rate") {
-    compact.sort((a, b) => (b.rating - a.rating) || (a.distance_m - b.distance_m))
-  } else if (sortMode === "best") {
-    compact.sort((a, b) => (b.__bestScore - a.__bestScore) || (a.distance_m - b.distance_m))
-  } else {
-    compact.sort((a, b) => (a.distance_m - b.distance_m) || (b.rating - a.rating))
-  }
-
-  lastResults = compact
-  setCount(compact.length)
-
+  setTab("results")
   const list = byId("resultsList")
-  renderResultsList(list, compact)
+  list.innerHTML = '<div class="hint">Caut...</div>'
 
-  clearMarkers()
-  compact.forEach(p => {
-    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) return
-    const marker = new google.maps.Marker({ map, position: { lat: p.lat, lng: p.lng }, title: p.name })
-    marker.addListener("click", () => {
-      focusOn(p.lat, p.lng, 15)
-      openStreetView(p.lat, p.lng)
-    })
-    markers.push(marker)
-  })
-
-  pushHistoryEntry({
-    createdAt: nowIso(),
-    center: { lat: c.lat, lng: c.lng },
-    radius: Number(radius),
-    catRaw,
-    travelMode,
-    sortMode,
-    count: compact.length
-  })
-
-  saveState()
-}
-
-function initMobileZoomControls() {
-  const zIn = byId("zoomInBtn")
-  const zOut = byId("zoomOutBtn")
-  const grabBtn = byId("grabBtn")
-  if (zIn) zIn.onclick = () => { if (map) map.setZoom((map.getZoom() || 13) + 1) }
-  if (zOut) zOut.onclick = () => { if (map) map.setZoom((map.getZoom() || 13) - 1) }
-
-  let grab = true
-  function apply() {
-    if (!map) return
-    map.setOptions({
-      gestureHandling: grab ? "greedy" : "cooperative",
-      scrollwheel: true
-    })
-    if (grabBtn) grabBtn.classList.toggle("active", grab)
+  const all = new Map()
+  for (const kw of cats) {
+    const req = { location: center, radius: r, keyword: kw }
+    const res = await nearbySearchAsync(req)
+    res.forEach(p => { if (p.place_id && !all.has(p.place_id)) all.set(p.place_id, p) })
   }
 
-  if (grabBtn) {
-    grabBtn.onclick = () => {
-      grab = !grab
-      apply()
-      saveState()
+  let res = Array.from(all.values())
+  res.forEach(p => p.realDist = google.maps.geometry.spherical.computeDistanceBetween(center, p.geometry.location))
+  res = res.filter(p => p.realDist <= r)
+
+  if (s === "dist") res.sort((a, b) => a.realDist - b.realDist)
+  else if (s === "rate") res.sort((a, b) => (b.rating || 0) - (a.rating || 0))
+  else res.sort((a, b) => ((b.rating || 0) * 1000 - b.realDist) - ((a.rating || 0) * 1000 - a.realDist))
+
+  const compact = res.slice(0, 25).map(p => {
+    const photo = (p.photos && p.photos.length) ? p.photos[0].getUrl({ maxWidth: 120 }) : ""
+    return {
+      place_id: p.place_id || "",
+      name: p.name || "",
+      vicinity: p.vicinity || "",
+      rating: p.rating || "-",
+      dist: Math.round(p.realDist || 0),
+      lat: p.geometry && p.geometry.location ? p.geometry.location.lat() : null,
+      lng: p.geometry && p.geometry.location ? p.geometry.location.lng() : null,
+      photo: photo
     }
-  }
-  apply()
-}
-
-function initRadiusControl() {
-  const rad = byId("rad")
-  if (rad) {
-    rad.value = String(circleRadius)
-    rad.oninput = () => {
-      const v = clamp(Number(rad.value), 200, 20000)
-      circleRadius = v
-      setRadiusUI(v)
-      if (circle) circle.setRadius(v)
-      saveState()
-    }
-  }
-  setRadiusUI(circleRadius)
-}
-
-function initCircle() {
-  const center = circleCenter ? circleCenter : userPos
-  circle = new google.maps.Circle({
-    map,
-    center,
-    radius: circleRadius,
-    fillColor: "#2a6cff",
-    fillOpacity: 0.15,
-    strokeColor: "#2a6cff",
-    strokeOpacity: 0.9,
-    strokeWeight: 2,
-    draggable: true,
-    editable: true
   })
 
-  circle.addListener("center_changed", () => {
-    const c = circle.getCenter()
-    if (!c) return
-    circleCenter = { lat: c.lat(), lng: c.lng() }
-    saveState()
-  })
-
-  circle.addListener("radius_changed", () => {
-    const r = clamp(Number(circle.getRadius()), 200, 20000)
-    circleRadius = r
-    setRadiusUI(r)
-    saveState()
-  })
-}
-
-function initAuthButton() {
-  const btn = byId("authBtn")
-  if (!btn) return
-  btn.onclick = () => {
-    location.href = "./login.html"
-  }
-}
-
-function initMap() {
-  loadState()
-
-  const isMobile = window.matchMedia("(max-width: 768px)").matches
-  map = new google.maps.Map(byId("map"), {
-    center: circleCenter ? circleCenter : userPos,
-    zoom: 13,
-    disableDefaultUI: false,
-    zoomControl: !isMobile,
-    streetViewControl: !isMobile,
-    mapTypeControl: false,
-    gestureHandling: "greedy",
-    scrollwheel: true
-  })
-
-  initMobileZoomControls()
-  initRadiusControl()
-  initCircle()
-  initTabs()
-  initAuthButton()
-  ensureCloseStreetViewWiring()
-
-  if (circleCenter) {
-    userPos = { ...circleCenter }
+  const payload = {
+    ts: Date.now(),
+    city: cityText,
+    cat: cRaw,
+    catLabel: labelForCategoryValue(cRaw),
+    rad: r,
+    sort: s,
+    mode: mode,
+    count: res.length,
+    center: { lat: center.lat(), lng: center.lng() },
+    results: compact
   }
 
-  const city = byId("city")
-  if (city) {
-    city.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") runScan()
+  saveResultsToHistory(payload)
+  renderResultsFromPlaces(compact)
+}
+
+function calculateAndDisplayRoute(dest, msgId) {
+  const mode = byId("travelMode").value
+
+  document.querySelectorAll(".route-info").forEach(e => e.style.display = "none")
+  document.querySelectorAll(".transit-steps").forEach(e => e.innerHTML = "")
+
+  const div = byId(msgId)
+  const stepsDiv = byId(msgId.replace("route-msg-", "steps-"))
+
+  if (div) {
+    div.style.display = "block"
+    div.innerText = "Calculare..."
+  }
+
+  const tryMode = (m, fallbackNote) => {
+    directionsService.route(directionsRequest(userPos, dest, m), (res, status) => {
+      if (status === "OK") {
+        directionsRenderer.setDirections(res)
+        const leg = res.routes[0].legs[0]
+        if (div) div.innerHTML = `${iconForMode(m)} ${leg.duration.text} (${leg.distance.text})`
+
+        if (m === "TRANSIT" && stepsDiv) {
+          let stepSummary = ""
+          leg.steps.forEach(step => {
+            if (step.travel_mode === "TRANSIT" && step.transit) {
+              const line = step.transit.line.short_name || step.transit.line.name
+              const vehicle = (step.transit.line.vehicle && step.transit.line.vehicle.name) ? step.transit.line.vehicle.name : "Transit"
+              stepSummary += `<span class="step-badge" style="background:#2980b9">${vehicle} ${line}</span> `
+            } else if (step.travel_mode === "WALKING") {
+              stepSummary += `<span class="step-badge">🚶 ${step.duration.text}</span> `
+            }
+          })
+          stepsDiv.innerHTML = stepSummary ? ("Traseu: " + stepSummary) : "Doar mers pe jos (prea aproape)."
+        } else if (stepsDiv) {
+          stepsDiv.innerHTML = fallbackNote ? `<span class="mini-muted">${escapeHtml(fallbackNote)}</span>` : ""
+        }
+      } else {
+        if (m === "BICYCLING") {
+          tryMode("WALKING", "Bicicletă nu are rută disponibilă aici. Am afișat mers pe jos.")
+          return
+        }
+        if (div) div.innerText = "Nu exista ruta."
+      }
     })
-    city.addEventListener("change", () => saveState())
   }
 
-  const sort = byId("sort")
-  if (sort) sort.onchange = () => { saveState(); if (lastResults.length) runScan() }
-  const cat = byId("cat")
-  if (cat) cat.onchange = () => saveState()
-  const travelMode = byId("travelMode")
-  if (travelMode) travelMode.onchange = () => updateRouteMode()
-
-  renderActiveTab()
-
-  if (!circleCenter && navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        circleCenter = { ...userPos }
-        if (circle) circle.setCenter(userPos)
-        focusOn(userPos.lat, userPos.lng, 13)
-        saveState()
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 8000 }
-    )
+  if (mode === "BICYCLING") {
+    tryMode("BICYCLING", "")
+    return
   }
+
+  tryMode(mode, "")
 }
 
-window.initMap = initMap
+byId("tabResults")?.addEventListener("click", () => setTab("results"))
+byId("tabHistory")?.addEventListener("click", () => { setTab("history"); renderHistory() })
+byId("tabFavs")?.addEventListener("click", () => { setTab("favs"); renderFavs() })
+
 window.runScan = runScan
 window.locateUser = locateUser
 window.updateRouteMode = updateRouteMode
