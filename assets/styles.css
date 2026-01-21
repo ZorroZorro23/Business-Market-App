@@ -90,3 +90,23 @@ button { font-weight: bold; cursor: pointer; text-transform: uppercase; border: 
     border: 1px solid #333;
   }
 }
+#exitFocusBtn {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid #444;
+  background: rgba(20, 20, 20, 0.92);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: none;
+  z-index: 9999;
+}
+
+#exitFocusBtn:hover {
+  background: rgba(35, 35, 35, 0.95);
+}
+
