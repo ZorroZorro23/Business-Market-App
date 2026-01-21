@@ -408,8 +408,16 @@
 
     <div id="panelArea">
       <div id="panelResults" class="panel active">
-        <div id="resultsList"></div>
-      </div>
+        
+  <div id="paginationBar" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+    <button id="prevPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:8px; background:#2b2b2b; border:1px solid #444; text-transform:none;">◀</button>
+    <div id="pageLabel" style="flex:1; text-align:center; font-size:11px; color:#aaa;">Pagina 1</div>
+    <button id="nextPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:8px; background:#2b2b2b; border:1px solid #444; text-transform:none;">▶</button>
+  </div>
+
+  <div id="resultsList"></div>
+</div>
+
 
       <div id="panelHistory" class="panel">
         <div id="historyList"></div>
