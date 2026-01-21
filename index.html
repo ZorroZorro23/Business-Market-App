@@ -16,10 +16,6 @@
       overflow: hidden;
     }
 
-    @supports (height: 100dvh) {
-      body { height: 100dvh; }
-    }
-
     #sidebar {
       width: 350px;
       background: #222;
@@ -31,9 +27,6 @@
       z-index: 10;
       box-shadow: 2px 0 10px #000;
       min-height: 0;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      -webkit-overflow-scrolling: touch;
     }
 
     h2 { color: #3b82f6; margin: 0; font-size: 22px; }
@@ -239,10 +232,6 @@
       background: #111;
     }
 
-    @supports (height: 100dvh) {
-      #mapWrap { height: 100dvh; }
-    }
-
     #map {
       width: 100%;
       height: 100%;
@@ -255,8 +244,6 @@
       right: 20px;
       width: 350px;
       height: 250px;
-      max-width: calc(100vw - 24px);
-      max-height: calc(100vh - 120px);
       background: #000;
       border: 3px solid #fff;
       border-radius: 8px;
@@ -297,51 +284,6 @@
       z-index: 99;
     }
 
-    @media (max-width: 768px) {
-      body { flex-direction: column; }
-
-      #sidebar {
-        width: 100%;
-        height: 60vh;
-        order: 2;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
-        padding: 10px;
-        padding-bottom: calc(10px + env(safe-area-inset-bottom));
-        z-index: 20;
-        gap: 5px;
-      }
-
-      #mapWrap {
-        width: 100%;
-        height: 40vh;
-        order: 1;
-      }
-
-      @supports (height: 100dvh) {
-        #sidebar { height: 60dvh; }
-        #mapWrap { height: 40dvh; }
-      }
-
-      #sv-panel {
-        right: 8px;
-        bottom: 8px;
-        width: calc(100vw - 16px);
-        height: 200px;
-        border-width: 2px;
-      }
-
-      h2 { display: none; }
-      label { display: none; }
-      input, select, button { padding: 8px; margin-bottom: 5px; font-size: 13px; }
-      .btn-geo { margin-bottom: 5px; padding: 5px; }
-      .tabs { margin-top: 0; }
-
-      #panelArea {
-        border-top: 0;
-        padding-top: 0;
-      }
-    }
-
     .grab-control {
       margin: 10px 10px 110px 0;
       display: flex;
@@ -361,6 +303,8 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.35);
       cursor: pointer;
       padding: 0;
+      margin: 0;
+      text-transform: none;
     }
 
     .grab-btn.active {
@@ -368,52 +312,34 @@
       box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
     }
 
-    .mobile-zoom {
-  position: absolute;
-  right: 8px;
-  top: 80px;
-  bottom: auto;
-  display: none;
-  z-index: 60;
-  gap: 8px;
-  flex-direction: column;
-  align-items: center;
-  pointer-events: auto;
-}
-
-.mobile-zoom button.active {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
-}
-
-
-    .mobile-zoom button {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      border: 1px solid #444;
-      background: #2a2a2a;
-      color: #fff;
-      font-size: 22px;
-      line-height: 1;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
-      cursor: pointer;
-      padding: 0;
-      margin: 0;
-      text-transform: none;
-    }
-
     @media (max-width: 768px) {
-      .mobile-zoom {
-        display: flex;
-        right: 8px;
-        bottom: 130px;
+      body { flex-direction: column; }
+
+      #sidebar {
+        width: 100%;
+        height: 60vh;
+        order: 2;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+        padding: 10px;
+        z-index: 20;
+        gap: 5px;
       }
 
-      .mobile-zoom button {
-        width: 40px;
-        height: 40px;
-        font-size: 20px;
+      #mapWrap {
+        width: 100%;
+        height: 40vh;
+        order: 1;
+      }
+
+      h2 { display: none; }
+      label { display: none; }
+      input, select, button { padding: 8px; margin-bottom: 5px; font-size: 13px; }
+      .btn-geo { margin-bottom: 5px; padding: 5px; }
+      .tabs { margin-top: 0; }
+
+      #panelArea {
+        border-top: 0;
+        padding-top: 0;
       }
     }
   </style>
@@ -471,10 +397,10 @@
 
     <div class="row-info">
       <span>Rezultate: <span id="count">0</span></span>
-      <span id="authOnlyMeta" style="color:#666">★ Favorite • 🕘 Istoric</span>
+      <span style="color:#666">★ Favorite • 🕘 Istoric</span>
     </div>
 
-    <div id="tabsRow" class="tabs">
+    <div class="tabs">
       <button id="tabResults" class="tab-btn active" type="button">Rezultate</button>
       <button id="tabHistory" class="tab-btn" type="button">Istoric</button>
       <button id="tabFavs" class="tab-btn" type="button">Favorite</button>
@@ -497,16 +423,8 @@
 
   <div id="mapWrap">
     <div id="map"></div>
-
-   <div id="mobileZoom" class="mobile-zoom">
-  <button id="zoomInBtn" type="button" aria-label="Zoom in">+</button>
-  <button id="zoomOutBtn" type="button" aria-label="Zoom out">−</button>
-  <button id="grabBtn" type="button" aria-label="Grab (1 deget)">🖐️</button>
-</div>
-
-
     <div id="sv-panel">
-      <button id="sv-close" onclick="document.getElementById('sv-panel').style.display='none'">X</button>
+      <button id="sv-close" onclick="document.getElementById('sv-panel').style.display='none'" type="button">X</button>
       <div id="sv-container"></div>
       <div id="sv-label">Street View Interactiv</div>
     </div>
