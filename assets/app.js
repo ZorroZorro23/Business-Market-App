@@ -3,6 +3,12 @@ let miniStreetView
 let markers = []
 let userPos = { lat: 44.4268, lng: 26.1025 }
 
+const PAGE_SIZE = 20
+const MAX_API_PAGES_PER_KEYWORD = 3
+let scanPages = []
+let scanTotalCount = 0
+let currentPageIndex = 0
+
 let currentSelectedDest = null
 let currentSelectedMsgId = null
 
@@ -258,63 +264,56 @@ function renderHistory() {
         <b>${label}</b> <span style="color:#888; font-size:11px">• ${rad}m • ${mode}</span><br>
         <span style="color:#aaa; font-size:11px">${city ? city + " • " : ""}${count} rezultate • ${when}</span>
         <div style="margin-top:8px; display:flex; gap:8px;">
-          <button class="btn-mini" style="width:120px;">Reia</button>
+          <button type="button" style="width:auto; padding:6px 10px; border-radius:8px; background:#2b2b2b; border:1px solid #444; text-transform:none;">Reîncarcă</button>
         </div>
       </div>
     `
 
-    const btn = card.querySelector(".btn-mini")
+    const btn = card.querySelector("button")
     btn.onclick = () => replayHistory(entry)
 
     list.appendChild(card)
   })
 }
 
+function loadState() {
+  const s = safeParseJSON(localStorage.getItem(LS_STATE), null)
+  if (!s) return
+
+  if (s.city != null && byId("city")) byId("city").value = s.city
+  if (s.cat != null && byId("cat")) byId("cat").value = s.cat
+  if (s.mode != null && byId("travelMode")) byId("travelMode").value = s.mode
+  if (s.sort != null && byId("sort")) byId("sort").value = s.sort
+  if (s.rad != null && byId("rad")) byId("rad").value = s.rad
+
+  if (s.center && s.center.lat != null && s.center.lng != null) {
+    userPos = { lat: s.center.lat, lng: s.center.lng }
+  }
+}
+
 function saveState() {
-  const state = {
+  const payload = {
     city: byId("city") ? byId("city").value : "",
     cat: byId("cat") ? byId("cat").value : "",
-    travelMode: byId("travelMode") ? byId("travelMode").value : "",
-    sort: byId("sort") ? byId("sort").value : "",
-    rad: byId("rad") ? parseInt(byId("rad").value, 10) : 1500
+    mode: byId("travelMode") ? byId("travelMode").value : "TRANSIT",
+    sort: byId("sort") ? byId("sort").value : "dist",
+    rad: byId("rad") ? byId("rad").value : "1500",
+    center: userPos ? { lat: userPos.lat, lng: userPos.lng } : null
   }
-  localStorage.setItem(LS_STATE, JSON.stringify(state))
+  localStorage.setItem(LS_STATE, JSON.stringify(payload))
 }
 
-function loadState() {
-  const state = safeParseJSON(localStorage.getItem(LS_STATE), null)
-  if (!state) return
-  if (byId("city") && typeof state.city === "string") byId("city").value = state.city
-  if (byId("cat") && typeof state.cat === "string") byId("cat").value = state.cat
-  if (byId("travelMode") && typeof state.travelMode === "string") byId("travelMode").value = state.travelMode
-  if (byId("sort") && typeof state.sort === "string") byId("sort").value = state.sort
-  if (byId("rad") && Number.isFinite(state.rad)) byId("rad").value = String(state.rad)
+function labelForCategoryValue(val) {
+  const sel = byId("cat")
+  if (!sel) return val
+  const opt = Array.from(sel.options).find(o => o.value === val)
+  return opt ? (opt.textContent || val) : val
 }
 
-function labelForCategoryValue(v) {
-  const map = {
-    "market": "Market / Minimarket",
-    "gas": "Benzinării",
-    "restaurant": "Restaurant / Cafea",
-    "tourism": "Turism",
-    "spa": "Spa / Relaxare",
-    "pharmacy": "Farmacie",
-    "gym": "Sală Fitness"
-  }
-  return map[v] || v
-}
-
-function getCategoryKeywords(v) {
-  const map = {
-    "market": ["market", "minimarket", "convenience store", "grocery", "supermarket"],
-    "gas": ["gas station", "fuel", "petrol"],
-    "restaurant": ["restaurant", "cafe", "coffee"],
-    "tourism": ["tourist attraction", "museum", "landmark"],
-    "spa": ["spa", "massage", "wellness"],
-    "pharmacy": ["pharmacy", "drugstore"],
-    "gym": ["gym", "fitness"]
-  }
-  return map[v] || [v]
+function getCategoryKeywords(rawVal) {
+  const v = String(rawVal || "").trim()
+  if (!v) return []
+  return v.split("|").map(x => x.trim()).filter(Boolean)
 }
 
 function iconForMode(m) {
@@ -425,6 +424,14 @@ function initMap() {
     el.addEventListener("change", saveState)
     el.addEventListener("input", saveState)
   })
+
+  const prevBtn = byId("prevPageBtn")
+  if (prevBtn) prevBtn.addEventListener("click", () => goToPage(currentPageIndex - 1))
+
+  const nextBtn = byId("nextPageBtn")
+  if (nextBtn) nextBtn.addEventListener("click", () => goToPage(currentPageIndex + 1))
+
+  setPaginationBarState()
 }
 
 window.initMap = initMap
@@ -457,12 +464,80 @@ function updateRouteMode() {
   }
 }
 
-function nearbySearchAsync(req) {
+function chunkIntoPages(items, pageSize) {
+  const out = []
+  const size = Math.max(1, Number(pageSize) || 1)
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
+function setPaginationBarState() {
+  const label = byId("pageLabel")
+  const prevBtn = byId("prevPageBtn")
+  const nextBtn = byId("nextPageBtn")
+
+  const totalPages = scanPages.length || 0
+  const pageNo = totalPages ? (currentPageIndex + 1) : 0
+
+  if (label) label.innerText = totalPages ? `Pagina ${pageNo} / ${totalPages}` : "Pagina 0 / 0"
+
+  if (prevBtn) {
+    prevBtn.disabled = currentPageIndex <= 0
+    prevBtn.style.opacity = prevBtn.disabled ? "0.35" : "1"
+    prevBtn.style.cursor = prevBtn.disabled ? "not-allowed" : "pointer"
+  }
+
+  if (nextBtn) {
+    nextBtn.disabled = currentPageIndex >= totalPages - 1
+    nextBtn.style.opacity = nextBtn.disabled ? "0.35" : "1"
+    nextBtn.style.cursor = nextBtn.disabled ? "not-allowed" : "pointer"
+  }
+}
+
+function renderCurrentPage() {
+  const page = scanPages[currentPageIndex] || []
+  renderResultsFromPlaces(page, scanTotalCount)
+  setPaginationBarState()
+}
+
+function setResultsPaged(allCompactResults) {
+  const arr = Array.isArray(allCompactResults) ? allCompactResults : []
+  scanTotalCount = arr.length
+  scanPages = chunkIntoPages(arr, PAGE_SIZE)
+  currentPageIndex = 0
+  renderCurrentPage()
+}
+
+function goToPage(index) {
+  const i = Number(index)
+  if (!Number.isFinite(i)) return
+  const total = scanPages.length
+  if (!total) return
+  if (i < 0 || i >= total) return
+  currentPageIndex = i
+  renderCurrentPage()
+}
+
+function nearbySearchPagedAsync(req, maxPages) {
+  const pagesLimit = Math.max(1, Number(maxPages) || 1)
+
   return new Promise((resolve) => {
-    service.nearbySearch(req, (res, status) => {
-      if (status === "OK" && res) resolve(res)
-      else resolve([])
-    })
+    const out = []
+    let pagesFetched = 0
+
+    const handle = (res, status, pagination) => {
+      if (status === "OK" && Array.isArray(res)) out.push(...res)
+      pagesFetched += 1
+
+      if (pagination && pagination.hasNextPage && pagesFetched < pagesLimit) {
+        setTimeout(() => pagination.nextPage(), 1400)
+        return
+      }
+
+      resolve(out)
+    }
+
+    service.nearbySearch(req, handle)
   })
 }
 
@@ -471,7 +546,7 @@ function clearMarkers() {
   markers = []
 }
 
-function renderResultsFromPlaces(places) {
+function renderResultsFromPlaces(places, totalCount) {
   const list = byId("resultsList")
   if (!list) return
   list.innerHTML = ""
@@ -484,7 +559,8 @@ function renderResultsFromPlaces(places) {
     return
   }
 
-  byId("count").innerText = String(places.length)
+  const c = (totalCount != null) ? Number(totalCount) : places.length
+  byId("count").innerText = String(Number.isFinite(c) ? c : places.length)
 
   places.forEach((p, idx) => {
     if (p.lat != null && p.lng != null) {
@@ -581,7 +657,7 @@ function replayHistory(entry) {
   currentSelectedDest = null
   currentSelectedMsgId = null
 
-  renderResultsFromPlaces(entry.results)
+  setResultsPaged(entry.results)
 
   if (entry.center && entry.center.lat != null && entry.center.lng != null) {
     const center = { lat: entry.center.lat, lng: entry.center.lng }
@@ -635,7 +711,7 @@ async function runScan() {
   const all = new Map()
   for (const kw of cats) {
     const req = { location: center, radius: r, keyword: kw }
-    const res = await nearbySearchAsync(req)
+    const res = await nearbySearchPagedAsync(req, MAX_API_PAGES_PER_KEYWORD)
     res.forEach(p => { if (p.place_id && !all.has(p.place_id)) all.set(p.place_id, p) })
   }
 
@@ -647,7 +723,7 @@ async function runScan() {
   else if (s === "rate") res.sort((a, b) => (b.rating || 0) - (a.rating || 0))
   else res.sort((a, b) => ((b.rating || 0) * 1000 - b.realDist) - ((a.rating || 0) * 1000 - a.realDist))
 
-  const compact = res.slice(0, 25).map(p => {
+  const compactAll = res.slice(0, 80).map(p => {
     const photo = (p.photos && p.photos.length) ? p.photos[0].getUrl({ maxWidth: 120 }) : ""
     return {
       place_id: p.place_id || "",
@@ -671,11 +747,11 @@ async function runScan() {
     mode: mode,
     count: res.length,
     center: { lat: center.lat(), lng: center.lng() },
-    results: compact
+    results: compactAll
   }
 
   saveResultsToHistory(payload)
-  renderResultsFromPlaces(compact)
+  setResultsPaged(compactAll)
 }
 
 function calculateAndDisplayRoute(dest, msgId) {
