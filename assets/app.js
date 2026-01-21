@@ -374,24 +374,22 @@ function initMobileControls(mapInstance) {
 }
 
 function initMap() {
-  loadState()
-  initTabs()
-  updateAuthButton()
-  updateRestrictedUI()
-  renderFavs()
-  renderHistory()
+  const mapEl = document.getElementById("map")
+  if (!mapEl) return
 
-  const isMobile = window.matchMedia("(max-width: 768px)").matches
+  const initialCenter = { lat: 44.4268, lng: 26.1025 }
 
- map = new google.maps.Map(byId("map"), {
-  center: userPos,
-  zoom: 13,
-  disableDefaultUI: false,
-  zoomControl: !isMobile,
-  streetViewControl: !isMobile,
-  mapTypeControl: false,
-  gestureHandling: "cooperative"
-})
+  window.map = new google.maps.Map(mapEl, {
+    center: initialCenter,
+    zoom: 13,
+    gestureHandling: "greedy",
+    scrollwheel: true,
+    clickableIcons: true,
+    fullscreenControl: true,
+    mapTypeControl: false,
+    streetViewControl: true
+  })
+}
 
 
   const controls = initMobileControls(map)
