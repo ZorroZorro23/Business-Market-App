@@ -218,7 +218,7 @@ function historyKey(entry) {
 }
 
 function saveResultsToHistory(payload) {
-  const u = requireLoginOrWarn()
+  const u = getAuthUser()
   if (!u) return
 
   const arr = readResultsHistory()
