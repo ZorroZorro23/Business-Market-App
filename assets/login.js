@@ -6,7 +6,8 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 import {
@@ -52,9 +53,7 @@ async function trackEvent(type, payload = {}) {
       ua: navigator.userAgent || "",
       lang: navigator.language || ""
     });
-  } catch (e) {
-    console.warn("Analytics error:", e);
-  }
+  } catch (e) {}
 }
 
 function setStatus(msg, kind = "muted") {
@@ -78,6 +77,8 @@ function prettyError(e) {
   if (c === "auth/network-request-failed") return "Eroare de rețea sau extensie (adblock).";
   if (c === "auth/invalid-email") return "Email invalid.";
   if (c === "auth/user-not-found") return "Nu există cont cu acest email.";
+  if (c === "auth/wrong-password") return "Parolă greșită.";
+  if (c === "auth/invalid-credential") return "Date de autentificare invalide.";
   if (c === "auth/too-many-requests") return "Prea multe încercări. Încearcă mai târziu.";
   if (c === "auth/popup-blocked") return "Popup blocat de browser.";
   if (c === "auth/popup-closed-by-user") return "Ai închis fereastra Google.";
@@ -92,9 +93,57 @@ function lockUI(v) {
   if (g) g.disabled = v;
   $("tabLogin").disabled = v;
   $("tabRegister").disabled = v;
+  $("email").disabled = v;
+  $("pass").disabled = v;
 }
 
 let mode = "login";
+let userAlreadyLoggedUIReady = false;
+
+function ensureLoggedInActionsRow() {
+  if (userAlreadyLoggedUIReady) return;
+  userAlreadyLoggedUIReady = true;
+
+  const hint = document.querySelector(".hint");
+  if (!hint) return;
+
+  const row = document.createElement("div");
+  row.style.marginTop = "10px";
+  row.style.display = "flex";
+  row.style.gap = "10px";
+
+  const btnContinue = document.createElement("button");
+  btnContinue.type = "button";
+  btnContinue.className = "btn primary";
+  btnContinue.textContent = "Continuă la hartă";
+  btnContinue.style.flex = "1";
+  btnContinue.addEventListener("click", () => { location.href = "./index.html"; });
+
+  const btnLogout = document.createElement("button");
+  btnLogout.type = "button";
+  btnLogout.className = "btn";
+  btnLogout.textContent = "Logout";
+  btnLogout.style.flex = "1";
+  btnLogout.style.background = "#222";
+  btnLogout.style.border = "1px solid #333";
+  btnLogout.addEventListener("click", async () => {
+    lockUI(true);
+    setStatus("Se deloghează...", "muted");
+    try {
+      await signOut(auth);
+      await trackEvent("logout", {});
+      setStatus("Delogat. Poți intra cu alt cont.", "ok");
+    } catch (e) {
+      setStatus(`${prettyError(e)} (${codeOf(e)})`, "bad");
+    } finally {
+      lockUI(false);
+    }
+  });
+
+  row.appendChild(btnContinue);
+  row.appendChild(btnLogout);
+  hint.parentElement.insertBefore(row, hint.nextSibling);
+}
 
 function setMode(m) {
   mode = m;
@@ -127,12 +176,13 @@ async function submitEmailPassword() {
     if (mode === "login") {
       await signInWithEmailAndPassword(auth, email, pass);
       await trackEvent("login_email", { email });
+      location.href = "./index.html";
     } else {
       await createUserWithEmailAndPassword(auth, email, pass);
       await trackEvent("signup_email", { email });
+      location.href = "./index.html";
     }
   } catch (e) {
-    console.warn("AUTH ERROR:", e);
     const c = codeOf(e);
     setStatus(`${prettyError(e)} (${c})`, "bad");
   } finally {
@@ -160,7 +210,6 @@ async function forgotPassword() {
 
     setStatus("Instrucțiunile pentru resetarea parolei au fost trimise către email. Verifică și Spam.", "ok");
   } catch (e) {
-    console.warn("RESET ERROR:", e);
     const c = codeOf(e);
     setStatus(`${prettyError(e)} (${c})`, "bad");
   } finally {
@@ -177,8 +226,8 @@ async function signInWithGoogle() {
     provider.setCustomParameters({ prompt: "select_account" });
     const cred = await signInWithPopup(auth, provider);
     await trackEvent("login_google", { email: cred.user?.email || "" });
+    location.href = "./index.html";
   } catch (e) {
-    console.warn("GOOGLE AUTH ERROR:", e);
     const c = codeOf(e);
     setStatus(`${prettyError(e)} (${c})`, "bad");
   } finally {
@@ -188,8 +237,8 @@ async function signInWithGoogle() {
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
-    setStatus("Autentificat. Redirecționare...", "ok");
-    setTimeout(() => { location.href = "./index.html"; }, 250);
+    setStatus("Ești deja autentificat. Poți continua la hartă sau să faci logout.", "ok");
+    ensureLoggedInActionsRow();
   }
 });
 
