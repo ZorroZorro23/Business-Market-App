@@ -2,6 +2,7 @@ let markerByPlaceId = new Map()
 let focusActive = false
 let focusedPlaceId = null
 let focusedMarker = null
+
 let map, circle, service, directionsService, directionsRenderer
 let miniStreetView
 let markers = []
@@ -342,6 +343,36 @@ function setGrabEnabled(v) {
   localStorage.setItem("atlasgo_grab_enabled", v ? "1" : "0")
 }
 
+function showExitFocusButton(show) {
+  const b = byId("exitFocusBtn")
+  if (!b) return
+  b.style.display = show ? "block" : "none"
+}
+
+function enterFocusModeByPlaceId(placeId) {
+  if (!placeId) return
+  const mk = markerByPlaceId.get(placeId)
+  if (!mk) return
+
+  focusActive = true
+  focusedPlaceId = placeId
+  focusedMarker = mk
+
+  markers.forEach(m => m.setVisible(false))
+  mk.setVisible(true)
+
+  showExitFocusButton(true)
+}
+
+function exitFocusMode() {
+  focusActive = false
+  focusedPlaceId = null
+  focusedMarker = null
+
+  markers.forEach(m => m.setVisible(true))
+  showExitFocusButton(false)
+}
+
 function initMap() {
   loadState()
 
@@ -434,6 +465,14 @@ function initMap() {
 
   const nextBtn = byId("nextPageBtn")
   if (nextBtn) nextBtn.addEventListener("click", () => goToPage(currentPageIndex + 1))
+
+  const exitBtn = byId("exitFocusBtn")
+  if (exitBtn) {
+    exitBtn.addEventListener("click", () => {
+      exitFocusMode()
+    })
+  }
+  showExitFocusButton(false)
 
   setPaginationBarState()
 }
@@ -555,6 +594,8 @@ function renderResultsFromPlaces(places, totalCount) {
   if (!list) return
   list.innerHTML = ""
 
+  exitFocusMode()
+  markerByPlaceId = new Map()
   clearMarkers()
 
   if (!places || !places.length) {
@@ -567,9 +608,25 @@ function renderResultsFromPlaces(places, totalCount) {
   byId("count").innerText = String(Number.isFinite(c) ? c : places.length)
 
   places.forEach((p, idx) => {
+    let mk = null
+
     if (p.lat != null && p.lng != null) {
       const pos = { lat: p.lat, lng: p.lng }
-      markers.push(new google.maps.Marker({ map: map, position: pos, title: p.name || "" }))
+
+      mk = new google.maps.Marker({
+        map: map,
+        position: pos,
+        title: p.name || ""
+      })
+
+      markers.push(mk)
+
+      if (p.place_id) {
+        markerByPlaceId.set(p.place_id, mk)
+        mk.addListener("click", () => {
+          enterFocusModeByPlaceId(p.place_id)
+        })
+      }
     }
 
     const badge = idx === 0 ? '<div class="best-badge">BEST</div>' : ""
@@ -584,6 +641,10 @@ function renderResultsFromPlaces(places, totalCount) {
       const dest = { lat: p.lat, lng: p.lng }
       currentSelectedDest = dest
       currentSelectedMsgId = "route-msg-" + idx
+
+      if (p.place_id) {
+        enterFocusModeByPlaceId(p.place_id)
+      }
 
       const panel = byId("sv-panel")
       if (panel) panel.style.display = "block"
@@ -633,6 +694,11 @@ function renderResultsFromPlaces(places, totalCount) {
       ev.stopPropagation()
       if (p.lat == null || p.lng == null) return
       const dest = { lat: p.lat, lng: p.lng }
+
+      if (p.place_id) {
+        enterFocusModeByPlaceId(p.place_id)
+      }
+
       const panel = byId("sv-panel")
       if (panel) panel.style.display = "block"
       if (miniStreetView) miniStreetView.setPosition(dest)
