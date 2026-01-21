@@ -1,3 +1,7 @@
+let markerByPlaceId = new Map()
+let focusActive = false
+let focusedPlaceId = null
+let focusedMarker = null
 let map, circle, service, directionsService, directionsRenderer
 let miniStreetView
 let markers = []
