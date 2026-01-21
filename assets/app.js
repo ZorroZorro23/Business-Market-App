@@ -608,12 +608,10 @@ function renderResultsFromPlaces(places, totalCount) {
   byId("count").innerText = String(Number.isFinite(c) ? c : places.length)
 
   places.forEach((p, idx) => {
-    let mk = null
-
     if (p.lat != null && p.lng != null) {
       const pos = { lat: p.lat, lng: p.lng }
 
-      mk = new google.maps.Marker({
+      const mk = new google.maps.Marker({
         map: map,
         position: pos,
         title: p.name || ""
@@ -645,15 +643,6 @@ function renderResultsFromPlaces(places, totalCount) {
       if (p.place_id) {
         enterFocusModeByPlaceId(p.place_id)
       }
-
-      const panel = byId("sv-panel")
-      if (panel) panel.style.display = "block"
-      if (miniStreetView) miniStreetView.setPosition(dest)
-
-      const svService = new google.maps.StreetViewService()
-      svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
-        if (status !== "OK" && panel) panel.style.display = "none"
-      })
 
       calculateAndDisplayRoute(dest, currentSelectedMsgId)
       map.setCenter(dest)
@@ -702,6 +691,12 @@ function renderResultsFromPlaces(places, totalCount) {
       const panel = byId("sv-panel")
       if (panel) panel.style.display = "block"
       if (miniStreetView) miniStreetView.setPosition(dest)
+
+      const svService = new google.maps.StreetViewService()
+      svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
+        if (status !== "OK" && panel) panel.style.display = "none"
+      })
+
       map.setCenter(dest)
       map.setZoom(16)
     }
