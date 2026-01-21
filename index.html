@@ -5,58 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>AtlasGo Market Scanner</title>
   <style>
-   html, body { height: 100%; }
-
-body {
-  margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: #1a1a1a;
-  color: #eee;
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-#exitFocusBtn {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
-
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  margin: 0;
-
-  border-radius: 10px;
-  border: 1px solid #444;
-  background: rgba(20, 20, 20, 0.75);
-  color: #fff;
-
-  font-size: 16px;
-  line-height: 1;
-
-  cursor: pointer;
-  display: none;
-  z-index: 9999;
-
-  text-transform: none;
-  box-sizing: border-box;
-}
-#exitFocusBtn:hover {
-  background: rgba(35, 35, 35, 0.9);
-}
-
-}
-
-#exitFocusBtn:hover {
-  background: rgba(35, 35, 35, 0.95);
-}
-
-
-#exitFocusBtn:hover {
-  background: rgba(35, 35, 35, 0.95);
-}
-
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a1a;
+      color: #eee;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
     }
 
     #sidebar {
@@ -271,7 +228,7 @@ body {
       position: relative;
       flex: 1;
       min-width: 0;
-      height: 100vh;
+      height: 100%;
       background: #111;
     }
 
@@ -353,6 +310,31 @@ body {
     .grab-btn.active {
       border-color: #3b82f6;
       box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
+    }
+
+    #exitFocusBtn {
+      position: absolute;
+      left: 14px;
+      bottom: 14px;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      margin: 0;
+      border-radius: 10px;
+      border: 1px solid #444;
+      background: rgba(20, 20, 20, 0.75);
+      color: #fff;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: none;
+      z-index: 9999;
+      text-transform: none;
+      box-sizing: border-box;
+      min-width: 0;
+    }
+    #exitFocusBtn:hover {
+      background: rgba(35, 35, 35, 0.9);
     }
 
     @media (max-width: 768px) {
@@ -451,16 +433,15 @@ body {
 
     <div id="panelArea">
       <div id="panelResults" class="panel active">
-        
-  <div id="paginationBar" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-    <button id="prevPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:8px; background:#2b2b2b; border:1px solid #444; text-transform:none;">◀</button>
-    <div id="pageLabel" style="flex:1; text-align:center; font-size:11px; color:#aaa;">Pagina 1</div>
-    <button id="nextPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:8px; background:#2b2b2b; border:1px solid #444; text-transform:none;">▶</button>
-  </div>
 
-  <div id="resultsList"></div>
-</div>
+        <div id="paginationBar" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <button id="prevPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:8px; background:#2b2b2b; border:1px solid #444; text-transform:none;">◀</button>
+          <div id="pageLabel" style="flex:1; text-align:center; font-size:11px; color:#aaa;">Pagina 1</div>
+          <button id="nextPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:8px; background:#2b2b2b; border:1px solid #444; text-transform:none;">▶</button>
+        </div>
 
+        <div id="resultsList"></div>
+      </div>
 
       <div id="panelHistory" class="panel">
         <div id="historyList"></div>
