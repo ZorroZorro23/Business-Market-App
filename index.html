@@ -55,15 +55,16 @@
     .btn-scan:hover { background: #2563eb; }
 
     .btn-help {
-      background: transparent;
-      border: 1px solid #444;
-      color: #aaa;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid #3a3a3a;
+      color: #cfcfcf;
       margin-top: 6px;
       text-transform: none;
-      font-weight: 700;
-      display: none;
+      font-weight: 800;
+      padding: 8px;
+      border-radius: 10px;
     }
-    .btn-help:hover { background: rgba(255,255,255,0.06); }
+    .btn-help:hover { background: rgba(255,255,255,0.08); }
 
     .btn-geo {
       background: transparent;
@@ -105,12 +106,12 @@
       margin: 0;
       padding: 8px 6px;
       font-size: 11px;
-      border-radius: 8px;
+      border-radius: 10px;
       background: rgba(255,255,255,0.05);
       border: 1px solid #333;
       color: #ddd;
       text-transform: none;
-      font-weight: 700;
+      font-weight: 800;
     }
     .tab-btn.active {
       border-color: #3b82f6;
@@ -158,66 +159,65 @@
     }
     .card:hover { background: #2a2a2a; border-left: 3px solid #3b82f6; }
 
-    .place-img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; background: #444; }
-    .place-info { flex: 1; padding-right: 54px; }
+    .place-img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; background: #444; }
+    .place-info { flex: 1; padding-right: 64px; min-width: 0; }
+
+    .best-badge { position: absolute; top: 8px; left: 8px; background: #27ae60; font-size: 9px; padding: 2px 6px; border-radius: 6px; font-weight: 900; }
 
     .route-info { font-size: 11px; color: #27ae60; margin-top: 5px; font-weight: bold; display: none; }
     .transit-steps {
       font-size: 10px; color: #ddd; margin-top: 4px;
-      background: rgba(255,255,255,0.1); padding: 4px; border-radius: 4px;
+      background: rgba(255,255,255,0.08); padding: 6px; border-radius: 8px;
     }
     .step-badge {
       display: inline-block;
       background: #333;
       border: 1px solid #555;
-      padding: 1px 4px;
-      border-radius: 3px;
-      margin-right: 3px;
-      margin-bottom: 2px;
+      padding: 1px 6px;
+      border-radius: 7px;
+      margin-right: 4px;
+      margin-bottom: 4px;
     }
 
-    .best-badge { position: absolute; top: 8px; right: 8px; background: #27ae60; font-size: 9px; padding: 2px 5px; border-radius: 3px; }
-
-    .fav-btn {
+    .action-col {
       position: absolute;
+      top: 10px;
       right: 10px;
-      top: 36px;
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-      background: #2b2b2b;
-      border: 1px solid #555;
-      color: #f1c40f;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      cursor: pointer;
-      user-select: none;
+      flex-direction: column;
+      gap: 8px;
+      opacity: 0.35;
+      transition: 0.2s;
     }
-    .fav-btn:hover { background: #333; }
+    .card:hover .action-col { opacity: 1; }
 
-    .mini-action {
-      position: absolute;
-      right: 10px;
-      bottom: 10px;
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-      background: #2b2b2b;
+    @media (hover: none) {
+      .action-col { opacity: 0.65; }
+    }
+
+    .action-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: rgba(43,43,43,0.85);
       border: 1px solid #555;
-      color: #ff6b6b;
-      display: flex;
+      color: #fff;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       font-size: 14px;
       cursor: pointer;
       user-select: none;
+      padding: 0;
+      margin: 0;
+      text-transform: none;
+      font-weight: 900;
     }
-    .mini-action:hover { background: #333; }
+    .action-btn:hover { background: rgba(55,55,55,0.95); }
 
-    .mini-action.sv-action { bottom: 10px; }
-    .mini-action.review-action { bottom: 46px; color: #3b82f6; }
+    .action-btn.fav-btn { color: #f1c40f; }
+    .action-btn.review-btn { color: #3b82f6; }
+    .action-btn.del-btn { color: #ff6b6b; }
 
     .row-info {
       font-size: 11px;
@@ -234,7 +234,7 @@
       color: #777;
       padding: 10px;
       border: 1px dashed #333;
-      border-radius: 8px;
+      border-radius: 10px;
       background: rgba(255,255,255,0.03);
     }
 
@@ -260,25 +260,24 @@
       height: 250px;
       background: #000;
       border: 3px solid #fff;
-      border-radius: 8px;
+      border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.7);
       display: none;
       z-index: 99;
       overflow: hidden;
     }
-    #sv-container { width: hookup?; }
     #sv-container { width: 100%; height: 100%; }
     #sv-close {
       position: absolute;
-      top: 5px;
-      right: 5px;
+      top: 6px;
+      right: 6px;
       background: #e74c3c;
       color: white;
       border: none;
-      width: 25px;
-      height: 25px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
-      font-weight: bold;
+      font-weight: 900;
       cursor: pointer;
       z-index: 100;
       padding: 0;
@@ -293,7 +292,7 @@
       background: rgba(0,0,0,0.6);
       color: white;
       font-size: 10px;
-      padding: 5px;
+      padding: 6px;
       text-align: center;
       pointer-events: none;
       z-index: 99;
@@ -309,7 +308,7 @@
     .grab-btn {
       width: 44px;
       height: 44px;
-      border-radius: 10px;
+      border-radius: 12px;
       border: 1px solid #444;
       background: #2a2a2a;
       color: #fff;
@@ -335,7 +334,7 @@
       height: 34px;
       padding: 0;
       margin: 0;
-      border-radius: 10px;
+      border-radius: 12px;
       border: 1px solid #444;
       background: rgba(20, 20, 20, 0.75);
       color: #fff;
@@ -365,7 +364,7 @@
     }
 
     .overlay-card {
-      width: min(520px, calc(100vw - 24px));
+      width: min(560px, calc(100vw - 24px));
       max-height: calc(100vh - 24px);
       background: #1f1f1f;
       border: 1px solid #444;
@@ -388,7 +387,7 @@
 
     .overlay-title {
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 900;
       color: #eee;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -407,6 +406,7 @@
       cursor: pointer;
       text-transform: none;
       flex: 0 0 auto;
+      font-weight: 900;
     }
     .overlay-close:hover { background: #333; }
 
@@ -417,10 +417,66 @@
       color: #aaa;
     }
 
+    .reviews-pager {
+      padding: 10px 12px;
+      border-bottom: 1px solid #333;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .reviews-pager button {
+      width: auto;
+      margin: 0;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: #2b2b2b;
+      border: 1px solid #444;
+      color: #ddd;
+      font-size: 11px;
+      text-transform: none;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .reviews-pager button:hover { background: #333; }
+
+    .reviews-pager button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .reviews-pager .pg-active {
+      border-color: #3b82f6;
+      background: rgba(59,130,246,0.18);
+      color: #fff;
+    }
+
+    .reviews-pager .pg-ellipsis {
+      font-size: 11px;
+      color: #777;
+      padding: 0 6px;
+      user-select: none;
+      font-weight: 900;
+    }
+
+    .reviews-pager .pg-label {
+      margin-left: auto;
+      font-size: 11px;
+      color: #aaa;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
     .overlay-body {
       padding: 12px;
       overflow: auto;
       min-height: 0;
+      flex: 1;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
     }
 
     .review-item {
@@ -453,7 +509,7 @@
 
     .review-author {
       font-size: 12px;
-      font-weight: 800;
+      font-weight: 900;
       color: #eee;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -471,7 +527,7 @@
       margin-top: 2px;
       font-size: 11px;
       color: #f1c40f;
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .review-text {
@@ -576,7 +632,6 @@
     </select>
 
     <button class="btn-scan" onclick="runScan()">Scaneaza Zona</button>
-
     <button id="helpBtn" class="btn-help" type="button">❔ Cum funcționează?</button>
 
     <div class="row-info">
@@ -594,9 +649,9 @@
       <div id="panelResults" class="panel active">
 
         <div id="paginationBar" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-          <button id="prevPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:8px; background:#2b2b2b; border:1px solid #444; text-transform:none;">◀</button>
-          <div id="pageLabel" style="flex:1; text-align:center; font-size:11px; color:#aaa;">Pagina 1</div>
-          <button id="nextPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:8px; background:#2b2b2b; border:1px solid #444; text-transform:none;">▶</button>
+          <button id="prevPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:10px; background:#2b2b2b; border:1px solid #444; text-transform:none;">◀</button>
+          <div id="pageLabel" style="flex:1; text-align:center; font-size:11px; color:#aaa; font-weight:800;">Pagina 1</div>
+          <button id="nextPageBtn" type="button" style="width:auto; padding:6px 10px; border-radius:10px; background:#2b2b2b; border:1px solid #444; text-transform:none;">▶</button>
         </div>
 
         <div id="resultsList"></div>
@@ -616,7 +671,7 @@
     <div id="map"></div>
     <button id="exitFocusBtn" type="button" aria-label="Ieși din focus">✕</button>
     <div id="sv-panel">
-      <button id="sv-close" onclick="document.getElementById('sv-panel').style.display='none'" type="button">X</button>
+      <button id="sv-close" type="button" aria-label="Închide Street View" onclick="document.getElementById('sv-panel').style.display='none'">X</button>
       <div id="sv-container"></div>
       <div id="sv-label">Street View Interactiv</div>
     </div>
@@ -629,6 +684,7 @@
         <button id="reviewsClose" class="overlay-close" type="button" aria-label="Închide">✕</button>
       </div>
       <div id="reviewsMeta" class="overlay-meta">Selectează un rezultat pentru a vedea recenziile.</div>
+      <div id="reviewsPager" class="reviews-pager"></div>
       <div id="reviewsBody" class="overlay-body"></div>
     </div>
   </div>
@@ -648,7 +704,7 @@
             <li>Folosește „Localizează-mă” sau caută un oraș.</li>
             <li>Alege categoria, raza și modul de transport.</li>
             <li>Apasă „Scanează Zona” pentru rezultate în jurul cercului.</li>
-            <li>În listă: ★ adaugă la favorite, 👁 deschide Street View, 💬 deschide recenziile Google (dacă sunt disponibile).</li>
+            <li>În listă: ★ adaugă la favorite, 💬 deschide recenziile Google, 👁 deschide Street View.</li>
           </ul>
         </div>
       </div>
