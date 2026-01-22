@@ -54,6 +54,17 @@
     .btn-scan { background: #3b82f6; margin-top: 5px; }
     .btn-scan:hover { background: #2563eb; }
 
+    .btn-help {
+      background: transparent;
+      border: 1px solid #444;
+      color: #aaa;
+      margin-top: 6px;
+      text-transform: none;
+      font-weight: 700;
+      display: none;
+    }
+    .btn-help:hover { background: rgba(255,255,255,0.06); }
+
     .btn-geo {
       background: transparent;
       border: 1px solid #27ae60;
@@ -205,6 +216,9 @@
     }
     .mini-action:hover { background: #333; }
 
+    .mini-action.sv-action { bottom: 10px; }
+    .mini-action.review-action { bottom: 46px; color: #3b82f6; }
+
     .row-info {
       font-size: 11px;
       color: #666;
@@ -252,6 +266,7 @@
       z-index: 99;
       overflow: hidden;
     }
+    #sv-container { width: hookup?; }
     #sv-container { width: 100%; height: 100%; }
     #sv-close {
       position: absolute;
@@ -337,6 +352,148 @@
       background: rgba(35, 35, 35, 0.9);
     }
 
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20000;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+
+    .overlay-card {
+      width: min(520px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      background: #1f1f1f;
+      border: 1px solid #444;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .overlay-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid #333;
+    }
+
+    .overlay-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #eee;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .overlay-close {
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      margin: 0;
+      border-radius: 10px;
+      background: #2b2b2b;
+      border: 1px solid #555;
+      color: #fff;
+      cursor: pointer;
+      text-transform: none;
+      flex: 0 0 auto;
+    }
+    .overlay-close:hover { background: #333; }
+
+    .overlay-meta {
+      padding: 10px 12px;
+      border-bottom: 1px solid #333;
+      font-size: 11px;
+      color: #aaa;
+    }
+
+    .overlay-body {
+      padding: 12px;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .review-item {
+      display: flex;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid #2f2f2f;
+    }
+
+    .review-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #333;
+      flex: 0 0 auto;
+    }
+
+    .review-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .review-headline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .review-author {
+      font-size: 12px;
+      font-weight: 800;
+      color: #eee;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .review-time {
+      font-size: 10px;
+      color: #777;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .review-rating {
+      margin-top: 2px;
+      font-size: 11px;
+      color: #f1c40f;
+      font-weight: 700;
+    }
+
+    .review-text {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #ddd;
+      line-height: 1.4;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .help-box {
+      font-size: 11px;
+      color: #ddd;
+      line-height: 1.5;
+    }
+    .help-box ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+    .help-box li { margin: 6px 0; }
+
     @media (max-width: 768px) {
       body { flex-direction: column; }
 
@@ -420,6 +577,8 @@
 
     <button class="btn-scan" onclick="runScan()">Scaneaza Zona</button>
 
+    <button id="helpBtn" class="btn-help" type="button">❔ Cum funcționează?</button>
+
     <div class="row-info">
       <span>Rezultate: <span id="count">0</span></span>
       <span style="color:#666">★ Favorite • 🕘 Istoric</span>
@@ -460,6 +619,39 @@
       <button id="sv-close" onclick="document.getElementById('sv-panel').style.display='none'" type="button">X</button>
       <div id="sv-container"></div>
       <div id="sv-label">Street View Interactiv</div>
+    </div>
+  </div>
+
+  <div id="reviewsOverlay" class="overlay" aria-hidden="true">
+    <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="reviewsTitle">
+      <div class="overlay-head">
+        <div id="reviewsTitle" class="overlay-title">Recenzii</div>
+        <button id="reviewsClose" class="overlay-close" type="button" aria-label="Închide">✕</button>
+      </div>
+      <div id="reviewsMeta" class="overlay-meta">Selectează un rezultat pentru a vedea recenziile.</div>
+      <div id="reviewsBody" class="overlay-body"></div>
+    </div>
+  </div>
+
+  <div id="helpOverlay" class="overlay" aria-hidden="true">
+    <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="overlay-head">
+        <div id="helpTitle" class="overlay-title">Ghid rapid</div>
+        <button id="helpClose" class="overlay-close" type="button" aria-label="Închide">✕</button>
+      </div>
+      <div class="overlay-body">
+        <div class="help-box">
+          <div style="color:#aaa; margin-bottom:10px;">
+            Apasă pe un rezultat ca să îl focusezi pe hartă și să vezi ruta. Pentru recenzii, folosește butonul 💬.
+          </div>
+          <ul>
+            <li>Folosește „Localizează-mă” sau caută un oraș.</li>
+            <li>Alege categoria, raza și modul de transport.</li>
+            <li>Apasă „Scanează Zona” pentru rezultate în jurul cercului.</li>
+            <li>În listă: ★ adaugă la favorite, 👁 deschide Street View, 💬 deschide recenziile Google (dacă sunt disponibile).</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 
