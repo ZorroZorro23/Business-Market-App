@@ -20,7 +20,19 @@ let currentSelectedMsgId = null
 const LS_FAVS = "atlasgo_favs_v2"
 const LS_HISTORY_RESULTS = "atlasgo_results_history_v1"
 const LS_STATE = "atlasgo_last_state_v2"
-const LS_HELP_DISMISSED = "atlasgo_help_dismissed_v1"
+
+const REVIEWS_PAGE_SIZE = 4
+
+let reviewsState = {
+  placeId: "",
+  name: "",
+  rating: null,
+  total: null,
+  url: "",
+  address: "",
+  reviews: [],
+  pageIndex: 0
+}
 
 const NOIMG_DATA_URL = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60">' +
@@ -43,137 +55,6 @@ function escapeHtml(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;")
-}
-
-function formatNumberRO(n) {
-  const num = Number(n)
-  if (!Number.isFinite(num)) return ""
-  return num.toLocaleString("ro-RO")
-}
-
-function setOverlayVisible(id, visible) {
-  const el = byId(id)
-  if (!el) return
-  el.style.display = visible ? "flex" : "none"
-  el.setAttribute("aria-hidden", visible ? "false" : "true")
-}
-
-function initOverlayUI() {
-  const reviewsOverlay = byId("reviewsOverlay")
-  const reviewsClose = byId("reviewsClose")
-  if (reviewsOverlay && reviewsClose) {
-    reviewsClose.addEventListener("click", () => setOverlayVisible("reviewsOverlay", false))
-    reviewsOverlay.addEventListener("click", (ev) => {
-      if (ev.target === reviewsOverlay) setOverlayVisible("reviewsOverlay", false)
-    })
-  }
-
-  const helpBtn = byId("helpBtn")
-  const helpOverlay = byId("helpOverlay")
-  const helpClose = byId("helpClose")
-  if (helpBtn && helpOverlay && helpClose) {
-    const dismissed = localStorage.getItem(LS_HELP_DISMISSED) === "1"
-    helpBtn.style.display = dismissed ? "none" : "block"
-
-    helpBtn.addEventListener("click", () => setOverlayVisible("helpOverlay", true))
-
-    const dismissHelp = () => {
-      setOverlayVisible("helpOverlay", false)
-      localStorage.setItem(LS_HELP_DISMISSED, "1")
-      helpBtn.style.display = "none"
-    }
-
-    helpClose.addEventListener("click", dismissHelp)
-    helpOverlay.addEventListener("click", (ev) => {
-      if (ev.target === helpOverlay) dismissHelp()
-    })
-  }
-}
-
-function formatReviewText(text) {
-  return escapeHtml(text || "").replaceAll("\n", "<br>")
-}
-
-function reviewTimeLabel(rv) {
-  if (rv && rv.relative_time_description) return String(rv.relative_time_description)
-  const t = rv && rv.time ? Number(rv.time) : NaN
-  if (Number.isFinite(t)) return new Date(t * 1000).toLocaleDateString("ro-RO")
-  return ""
-}
-
-function renderReviewItem(rv) {
-  const author = rv && rv.author_name ? String(rv.author_name) : "Utilizator"
-  const photo = rv && rv.profile_photo_url ? String(rv.profile_photo_url) : ""
-  const rating = Number(rv && rv.rating)
-  const ratingLabel = Number.isFinite(rating) ? rating.toFixed(1) : "-"
-  const time = reviewTimeLabel(rv)
-  const body = formatReviewText(rv && rv.text ? String(rv.text) : "")
-
-  return `
-    <div class="review-item">
-      <img class="review-avatar" src="${escapeHtml(photo || NOIMG_DATA_URL)}" referrerpolicy="no-referrer">
-      <div class="review-main">
-        <div class="review-headline">
-          <div class="review-author">${escapeHtml(author)}</div>
-          <div class="review-time">${escapeHtml(time)}</div>
-        </div>
-        <div class="review-rating">${escapeHtml(ratingLabel)} ★</div>
-        <div class="review-text">${body}</div>
-      </div>
-    </div>
-  `
-}
-
-function openReviewsForPlaceId(placeId, placeNameHint) {
-  if (!placeId || !service) return
-
-  const title = byId("reviewsTitle")
-  const meta = byId("reviewsMeta")
-  const body = byId("reviewsBody")
-
-  if (title) title.textContent = placeNameHint ? `Recenzii: ${placeNameHint}` : "Recenzii"
-  if (meta) meta.textContent = "Se încarcă..."
-  if (body) body.innerHTML = ""
-
-  setOverlayVisible("reviewsOverlay", true)
-
-  service.getDetails(
-    {
-      placeId: placeId,
-      fields: ["name", "rating", "user_ratings_total", "reviews", "url"]
-    },
-    (place, status) => {
-      if (status !== "OK" || !place) {
-        if (meta) meta.textContent = "Nu am putut încărca recenziile pentru această locație."
-        return
-      }
-
-      const name = place.name || placeNameHint || "Locație"
-      if (title) title.textContent = `Recenzii: ${name}`
-
-      const rating = Number(place.rating)
-      const ratingLabel = Number.isFinite(rating) ? rating.toFixed(1) : "-"
-
-      const total = Number(place.user_ratings_total)
-      const totalLabel = Number.isFinite(total) && total > 0 ? formatNumberRO(total) : "-"
-
-      const url = place.url ? String(place.url) : ""
-      const linkHtml = url
-        ? ` • <a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="color:#3b82f6; text-decoration:none;">Deschide în Google</a>`
-        : ""
-
-      if (meta) meta.innerHTML = `<span style="color:#f1c40f">${escapeHtml(ratingLabel)} ★</span> <span style="color:#888">(${escapeHtml(totalLabel)})</span>${linkHtml}`
-
-      const reviews = Array.isArray(place.reviews) ? place.reviews : []
-      if (!reviews.length) {
-        if (body) body.innerHTML = '<div class="hint">Google nu a furnizat recenzii pentru această locație.</div>'
-        return
-      }
-
-      const html = reviews.slice(0, 20).map(renderReviewItem).join("")
-      if (body) body.innerHTML = html
-    }
-  )
 }
 
 function getAuthUser() {
@@ -255,8 +136,8 @@ function toggleFav(placeObj) {
       place_id: placeId,
       name: placeObj.name || "",
       vicinity: placeObj.vicinity || "",
-      rating: placeObj.rating || 0,
-      reviewsCount: Number(placeObj.reviewsCount) || 0,
+      rating: Number(placeObj.rating) || 0,
+      reviews_total: Number(placeObj.reviews_total) || 0,
       dist: Math.round(placeObj.realDist || 0),
       lat: placeObj.geometry && placeObj.geometry.location ? placeObj.geometry.location.lat() : null,
       lng: placeObj.geometry && placeObj.geometry.location ? placeObj.geometry.location.lng() : null,
@@ -305,29 +186,60 @@ function renderFavs() {
   arr.forEach((f) => {
     const card = document.createElement("div")
     card.className = "card"
+
     card.onclick = () => {
       if (f.lat == null || f.lng == null) return
-      selectSavedPlace(f)
-      setTab("results")
+      const dest = { lat: f.lat, lng: f.lng }
+      currentSelectedDest = dest
+      currentSelectedMsgId = "route-msg-fav"
+      enterFocusModeForArbitraryLocation(dest)
+      calculateAndDisplayRoute(dest, "route-msg-fav")
+      map.setCenter(dest)
+      map.setZoom(16)
     }
 
     const thumb = f.photo ? f.photo : NOIMG_DATA_URL
-    const rc = Number(f.reviewsCount)
-    const rcLabel = Number.isFinite(rc) && rc > 0 ? ` (${formatNumberRO(rc)})` : ""
+
+    const ratingNum = Number(f.rating) || 0
+    const ratingTxt = ratingNum ? ratingNum.toFixed(1) : "-"
+    const totalTxt = Number(f.reviews_total) > 0 ? ` (${Number(f.reviews_total)})` : ""
+
     card.innerHTML = `
       <img src="${thumb}" class="place-img">
       <div class="place-info">
-        <div style="position:absolute; right:10px; top:8px; font-size:11px; color:#f1c40f;">★</div>
         <b>${escapeHtml(f.name)}</b><br>
-        <span style="color:#f1c40f">${(f.rating || 0).toFixed ? (f.rating || 0).toFixed(1) : (f.rating || 0)} ★${escapeHtml(rcLabel)}</span> |
-        <span style="color:#aaa; font-size:11px">${f.dist || 0}m</span>
+        <span style="color:#f1c40f">${escapeHtml(ratingTxt)} ★${escapeHtml(totalTxt)}</span> |
+        <span style="color:#aaa; font-size:11px">${escapeHtml(String(f.dist || 0))}m</span>
         <div class="mini-muted" style="margin-top:4px;">${escapeHtml(f.vicinity || "")}</div>
       </div>
-      <div class="mini-action" title="Șterge">🗑</div>
+      <div class="action-col" aria-label="Acțiuni">
+        <button type="button" class="action-btn review-action" title="Recenzii">💬</button>
+        <button type="button" class="action-btn sv-action" title="Street View">👁️</button>
+        <button type="button" class="action-btn del-action" title="Șterge din favorite">🗑</button>
+      </div>
     `
 
-    const del = card.querySelector(".mini-action")
-    del.onclick = (ev) => {
+    const reviewBtn = card.querySelector(".review-action")
+    reviewBtn.onclick = (ev) => {
+      ev.stopPropagation()
+      if (!f.place_id) {
+        alert("Acest favorit nu are place_id salvat.")
+        return
+      }
+      openReviewsForPlaceId(f.place_id, f.name || "Recenzii")
+    }
+
+    const svBtn = card.querySelector(".sv-action")
+    svBtn.onclick = (ev) => {
+      ev.stopPropagation()
+      if (f.lat == null || f.lng == null) return
+      openStreetViewAt({ lat: f.lat, lng: f.lng })
+      map.setCenter({ lat: f.lat, lng: f.lng })
+      map.setZoom(16)
+    }
+
+    const delBtn = card.querySelector(".del-action")
+    delBtn.onclick = (ev) => {
       ev.stopPropagation()
       removeFavById(f.place_id)
     }
@@ -499,6 +411,18 @@ function enterFocusModeByPlaceId(placeId) {
   showExitFocusButton(true)
 }
 
+function enterFocusModeForArbitraryLocation(dest) {
+  focusActive = false
+  focusedPlaceId = null
+  focusedMarker = null
+  markers.forEach(m => m.setVisible(true))
+  showExitFocusButton(false)
+
+  if (!dest || dest.lat == null || dest.lng == null) return
+
+  showExitFocusButton(false)
+}
+
 function exitFocusMode() {
   focusActive = false
   focusedPlaceId = null
@@ -506,6 +430,303 @@ function exitFocusMode() {
 
   markers.forEach(m => m.setVisible(true))
   showExitFocusButton(false)
+}
+
+function openOverlay(overlayId) {
+  const o = byId(overlayId)
+  if (!o) return
+
+  if (overlayId !== "reviewsOverlay") closeOverlay("reviewsOverlay")
+  if (overlayId !== "helpOverlay") closeOverlay("helpOverlay")
+
+  o.style.display = "flex"
+  o.setAttribute("aria-hidden", "false")
+}
+
+function closeOverlay(overlayId) {
+  const o = byId(overlayId)
+  if (!o) return
+  o.style.display = "none"
+  o.setAttribute("aria-hidden", "true")
+}
+
+function setupOverlays() {
+  const reviewsClose = byId("reviewsClose")
+  if (reviewsClose) reviewsClose.addEventListener("click", () => closeOverlay("reviewsOverlay"))
+
+  const helpClose = byId("helpClose")
+  if (helpClose) helpClose.addEventListener("click", () => closeOverlay("helpOverlay"))
+
+  const reviewsOverlay = byId("reviewsOverlay")
+  if (reviewsOverlay) {
+    reviewsOverlay.addEventListener("click", (ev) => {
+      if (ev.target === reviewsOverlay) closeOverlay("reviewsOverlay")
+    })
+  }
+
+  const helpOverlay = byId("helpOverlay")
+  if (helpOverlay) {
+    helpOverlay.addEventListener("click", (ev) => {
+      if (ev.target === helpOverlay) closeOverlay("helpOverlay")
+    })
+  }
+
+  const helpBtn = byId("helpBtn")
+  if (helpBtn) {
+    helpBtn.addEventListener("click", () => {
+      closeOverlay("reviewsOverlay")
+      openOverlay("helpOverlay")
+    })
+  }
+}
+
+function openStreetViewAt(dest) {
+  if (!dest || dest.lat == null || dest.lng == null) return
+
+  const panel = byId("sv-panel")
+  if (panel) panel.style.display = "block"
+  if (miniStreetView) miniStreetView.setPosition(dest)
+
+  const svService = new google.maps.StreetViewService()
+  svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
+    if (status !== "OK" && panel) panel.style.display = "none"
+  })
+}
+
+function reviewPageCount() {
+  const total = Array.isArray(reviewsState.reviews) ? reviewsState.reviews.length : 0
+  return Math.max(1, Math.ceil(total / REVIEWS_PAGE_SIZE))
+}
+
+function clamp(n, lo, hi) {
+  const x = Number(n)
+  if (!Number.isFinite(x)) return lo
+  return Math.min(hi, Math.max(lo, x))
+}
+
+function buildPagerModel(current, total) {
+  const cur = clamp(current, 0, Math.max(0, total - 1))
+  const out = []
+
+  if (total <= 7) {
+    for (let i = 0; i < total; i++) out.push(i)
+    return out
+  }
+
+  const push = (v) => out.push(v)
+
+  push(0)
+
+  const left = cur - 1
+  const right = cur + 1
+
+  if (left > 2) push("...")
+
+  const start = Math.max(1, cur - 1)
+  const end = Math.min(total - 2, cur + 1)
+
+  for (let i = start; i <= end; i++) {
+    if (i !== 0 && i !== total - 1) push(i)
+  }
+
+  if (right < total - 3) push("...")
+
+  push(total - 1)
+
+  const cleaned = []
+  let last = null
+  for (const item of out) {
+    if (item === "..." && last === "...") continue
+    cleaned.push(item)
+    last = item
+  }
+
+  return cleaned
+}
+
+function renderReviewsPager() {
+  const pager = byId("reviewsPager")
+  if (!pager) return
+
+  const totalReviews = Array.isArray(reviewsState.reviews) ? reviewsState.reviews.length : 0
+  if (!totalReviews) {
+    pager.style.display = "none"
+    pager.innerHTML = ""
+    return
+  }
+
+  const totalPages = reviewPageCount()
+  const cur = clamp(reviewsState.pageIndex, 0, totalPages - 1)
+  reviewsState.pageIndex = cur
+
+  pager.style.display = totalPages > 1 ? "flex" : "none"
+  pager.innerHTML = ""
+
+  const prevBtn = document.createElement("button")
+  prevBtn.type = "button"
+  prevBtn.textContent = "◀"
+  prevBtn.disabled = cur <= 0
+  prevBtn.onclick = () => { reviewsState.pageIndex = cur - 1; renderReviewsOverlay() }
+  pager.appendChild(prevBtn)
+
+  const model = buildPagerModel(cur, totalPages)
+  model.forEach((item) => {
+    if (item === "...") {
+      const span = document.createElement("span")
+      span.className = "pg-ellipsis"
+      span.textContent = "…"
+      pager.appendChild(span)
+      return
+    }
+
+    const b = document.createElement("button")
+    b.type = "button"
+    b.textContent = String(Number(item) + 1)
+    if (item === cur) b.classList.add("pg-active")
+    b.onclick = () => { reviewsState.pageIndex = Number(item); renderReviewsOverlay() }
+    pager.appendChild(b)
+  })
+
+  const nextBtn = document.createElement("button")
+  nextBtn.type = "button"
+  nextBtn.textContent = "▶"
+  nextBtn.disabled = cur >= totalPages - 1
+  nextBtn.onclick = () => { reviewsState.pageIndex = cur + 1; renderReviewsOverlay() }
+  pager.appendChild(nextBtn)
+
+  const lbl = document.createElement("div")
+  lbl.className = "pg-label"
+  lbl.textContent = `Pagina ${cur + 1} / ${totalPages}`
+  pager.appendChild(lbl)
+}
+
+function renderReviewsOverlay() {
+  const titleEl = byId("reviewsTitle")
+  const metaEl = byId("reviewsMeta")
+  const bodyEl = byId("reviewsBody")
+
+  if (titleEl) titleEl.textContent = reviewsState.name ? `Recenzii • ${reviewsState.name}` : "Recenzii"
+
+  const ratingTxt = (reviewsState.rating != null) ? String(Number(reviewsState.rating).toFixed(1)) : "-"
+  const totalTxt = (reviewsState.total != null) ? String(Number(reviewsState.total)) : "-"
+
+  const addressTxt = reviewsState.address ? ` • ${reviewsState.address}` : ""
+  const urlTxt = reviewsState.url ? ' • <a href="' + escapeHtml(reviewsState.url) + '" target="_blank" rel="noopener noreferrer" style="color:#8ab4f8;">Deschide în Google</a>' : ""
+
+  if (metaEl) metaEl.innerHTML = `Rating: <b>${escapeHtml(ratingTxt)}</b> ★ (${escapeHtml(totalTxt)})${escapeHtml(addressTxt)}${urlTxt}`
+
+  if (!bodyEl) return
+
+  const reviews = Array.isArray(reviewsState.reviews) ? reviewsState.reviews : []
+  if (!reviews.length) {
+    bodyEl.innerHTML = '<div class="hint">Nu există recenzii disponibile pentru această locație (sau Google nu le-a furnizat).</div>'
+    renderReviewsPager()
+    return
+  }
+
+  const totalPages = reviewPageCount()
+  const cur = clamp(reviewsState.pageIndex, 0, totalPages - 1)
+  reviewsState.pageIndex = cur
+
+  const start = cur * REVIEWS_PAGE_SIZE
+  const end = start + REVIEWS_PAGE_SIZE
+  const page = reviews.slice(start, end)
+
+  let html = ""
+  page.forEach((r) => {
+    const author = escapeHtml(r.author_name || "Utilizator")
+    const time = escapeHtml(r.relative_time_description || "")
+    const text = escapeHtml(r.text || "")
+    const stars = Number(r.rating) ? Number(r.rating).toFixed(1) : "-"
+    const avatar = r.profile_photo_url ? escapeHtml(r.profile_photo_url) : ""
+
+    html += `
+      <div class="review-item">
+        <img class="review-avatar" src="${avatar || NOIMG_DATA_URL}" onerror="this.src='${NOIMG_DATA_URL}'" />
+        <div class="review-main">
+          <div class="review-headline">
+            <div class="review-author">${author}</div>
+            <div class="review-time">${time}</div>
+          </div>
+          <div class="review-rating">${escapeHtml(stars)} ★</div>
+          <div class="review-text">${text || "(fără text)"}</div>
+        </div>
+      </div>
+    `
+  })
+
+  bodyEl.innerHTML = html
+  renderReviewsPager()
+}
+
+function openReviewsForPlaceId(placeId, fallbackName) {
+  if (!service) return
+  if (!placeId) return
+
+  closeOverlay("helpOverlay")
+  openOverlay("reviewsOverlay")
+
+  reviewsState = {
+    placeId: placeId,
+    name: fallbackName || "",
+    rating: null,
+    total: null,
+    url: "",
+    address: "",
+    reviews: [],
+    pageIndex: 0
+  }
+
+  const titleEl = byId("reviewsTitle")
+  const metaEl = byId("reviewsMeta")
+  const bodyEl = byId("reviewsBody")
+
+  if (titleEl) titleEl.textContent = fallbackName ? `Recenzii • ${fallbackName}` : "Recenzii"
+  if (metaEl) metaEl.textContent = "Se încarcă recenziile..."
+  if (bodyEl) bodyEl.innerHTML = '<div class="hint">Se încarcă...</div>'
+
+  const req = {
+    placeId: placeId,
+    fields: [
+      "name",
+      "rating",
+      "user_ratings_total",
+      "url",
+      "reviews",
+      "formatted_address",
+      "vicinity"
+    ]
+  }
+
+  service.getDetails(req, (place, status) => {
+    if (status !== "OK" || !place) {
+      if (metaEl) metaEl.textContent = "Nu pot încărca recenziile (Google Places)."
+      if (bodyEl) bodyEl.innerHTML = '<div class="hint">Încearcă din nou sau verifică setările cheii API.</div>'
+      const pager = byId("reviewsPager")
+      if (pager) { pager.style.display = "none"; pager.innerHTML = "" }
+      return
+    }
+
+    const addr = place.formatted_address || place.vicinity || ""
+    const reviews = Array.isArray(place.reviews) ? place.reviews.slice() : []
+
+    reviews.sort((a, b) => {
+      const ta = Number(a.time) || 0
+      const tb = Number(b.time) || 0
+      return tb - ta
+    })
+
+    reviewsState.placeId = placeId
+    reviewsState.name = place.name || fallbackName || ""
+    reviewsState.rating = place.rating != null ? Number(place.rating) : null
+    reviewsState.total = place.user_ratings_total != null ? Number(place.user_ratings_total) : null
+    reviewsState.url = place.url || ""
+    reviewsState.address = addr
+    reviewsState.reviews = reviews
+    reviewsState.pageIndex = 0
+
+    renderReviewsOverlay()
+  })
 }
 
 function initMap() {
@@ -570,7 +791,8 @@ function initMap() {
     draggable: true
   })
 
-  circle.addListener("center_changed", () => { userPos = circle.getCenter() })
+  circle.addListener("center_changed", () => { userPos = circle.getCenter(); saveState() })
+  circle.addListener("radius_changed", () => { saveState() })
 
   service = new google.maps.places.PlacesService(map)
 
@@ -609,7 +831,7 @@ function initMap() {
   }
   showExitFocusButton(false)
 
-  initOverlayUI()
+  setupOverlays()
 
   setPaginationBarState()
 }
@@ -635,6 +857,7 @@ function updateMapCenter() {
   map.setCenter(userPos)
   map.setZoom(15)
   circle.setCenter(userPos)
+  saveState()
 }
 
 function updateRouteMode() {
@@ -766,10 +989,13 @@ function renderResultsFromPlaces(places, totalCount) {
 
     const badge = idx === 0 ? '<div class="best-badge">BEST</div>' : ""
     const thumbUrl = p.photo ? p.photo : NOIMG_DATA_URL
+
     const favSymbol = (p.place_id && isFav(p.place_id)) ? "★" : "☆"
     const safePlaceId = (p.place_id || "").replace(/'/g, "")
-    const rc = Number(p.reviewsCount)
-    const rcLabel = Number.isFinite(rc) && rc > 0 ? ` (${formatNumberRO(rc)})` : ""
+
+    const ratingVal = p.rating != null && p.rating !== "-" ? Number(p.rating) : null
+    const ratingTxt = ratingVal != null && Number.isFinite(ratingVal) ? ratingVal.toFixed(1) : "-"
+    const totalTxt = Number(p.reviews_total) > 0 ? ` (${Number(p.reviews_total)})` : ""
 
     const card = document.createElement("div")
     card.className = "card"
@@ -793,18 +1019,20 @@ function renderResultsFromPlaces(places, totalCount) {
       <img src="${thumbUrl}" class="place-img">
       <div class="place-info">
         <b>${escapeHtml(p.name || "")}</b><br>
-        <span style="color:#f1c40f">${escapeHtml(String(p.rating || "-"))} ★${escapeHtml(rcLabel)}</span> |
+        <span style="color:#f1c40f">${escapeHtml(String(ratingTxt))} ★${escapeHtml(totalTxt)}</span> |
         <span style="color:#aaa; font-size:11px">${escapeHtml(String(p.dist || 0))}m</span>
         <div class="mini-muted" style="margin-top:4px;">${escapeHtml(p.vicinity || "")}</div>
         <div id="route-msg-${idx}" class="route-info"></div>
         <div id="steps-${idx}" class="transit-steps"></div>
       </div>
-      <div class="fav-btn" data-fav-id="${safePlaceId}" title="Favorite">${favSymbol}</div>
-      <div class="mini-action review-action" title="Recenzii">💬</div>
-      <div class="mini-action sv-action" title="Street View">👁️</div>
+      <div class="action-col" aria-label="Acțiuni">
+        <button type="button" class="action-btn fav-action" data-fav-id="${safePlaceId}" title="Favorite">${favSymbol}</button>
+        <button type="button" class="action-btn review-action" title="Recenzii">💬</button>
+        <button type="button" class="action-btn sv-action" title="Street View">👁️</button>
+      </div>
     `
 
-    const favBtn = card.querySelector(".fav-btn")
+    const favBtn = card.querySelector(".fav-action")
     favBtn.onclick = (ev) => {
       ev.stopPropagation()
       toggleFav({
@@ -812,7 +1040,7 @@ function renderResultsFromPlaces(places, totalCount) {
         name: p.name,
         vicinity: p.vicinity,
         rating: Number(p.rating) || 0,
-        reviewsCount: Number(p.reviewsCount) || 0,
+        reviews_total: Number(p.reviews_total) || 0,
         realDist: Number(p.dist) || 0,
         geometry: { location: new google.maps.LatLng(p.lat, p.lng) },
         photos: p.photo ? [{ getUrl: () => p.photo }] : []
@@ -820,25 +1048,17 @@ function renderResultsFromPlaces(places, totalCount) {
     }
 
     const reviewBtn = card.querySelector(".review-action")
-    if (reviewBtn) {
-      reviewBtn.onclick = (ev) => {
-        ev.stopPropagation()
-        if (!p.place_id) {
-          const title = byId("reviewsTitle")
-          const meta = byId("reviewsMeta")
-          const body = byId("reviewsBody")
-          if (title) title.textContent = "Recenzii"
-          if (meta) meta.textContent = "Acest rezultat nu are un identificator Google Places."
-          if (body) body.innerHTML = ""
-          setOverlayVisible("reviewsOverlay", true)
-          return
-        }
-        openReviewsForPlaceId(p.place_id, p.name || "")
+    reviewBtn.onclick = (ev) => {
+      ev.stopPropagation()
+      if (!p.place_id) {
+        alert("Nu există place_id pentru acest rezultat.")
+        return
       }
+      openReviewsForPlaceId(p.place_id, p.name || "Recenzii")
     }
 
     const svBtn = card.querySelector(".sv-action")
-    if (svBtn) svBtn.onclick = (ev) => {
+    svBtn.onclick = (ev) => {
       ev.stopPropagation()
       if (p.lat == null || p.lng == null) return
       const dest = { lat: p.lat, lng: p.lng }
@@ -847,15 +1067,7 @@ function renderResultsFromPlaces(places, totalCount) {
         enterFocusModeByPlaceId(p.place_id)
       }
 
-      const panel = byId("sv-panel")
-      if (panel) panel.style.display = "block"
-      if (miniStreetView) miniStreetView.setPosition(dest)
-
-      const svService = new google.maps.StreetViewService()
-      svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
-        if (status !== "OK" && panel) panel.style.display = "none"
-      })
-
+      openStreetViewAt(dest)
       map.setCenter(dest)
       map.setZoom(16)
     }
@@ -877,7 +1089,8 @@ function replayHistory(entry) {
   saveState()
 
   directionsRenderer.setDirections({ routes: [] })
-  byId("sv-panel").style.display = "none"
+  const svPanel = byId("sv-panel")
+  if (svPanel) svPanel.style.display = "none"
   currentSelectedDest = null
   currentSelectedMsgId = null
 
@@ -892,26 +1105,6 @@ function replayHistory(entry) {
   }
 }
 
-function selectSavedPlace(f) {
-  if (f.lat == null || f.lng == null) return
-  const dest = { lat: f.lat, lng: f.lng }
-  currentSelectedDest = dest
-  currentSelectedMsgId = "route-msg-fav"
-
-  directionsRenderer.setDirections({ routes: [] })
-  byId("sv-panel").style.display = "block"
-  miniStreetView.setPosition(dest)
-
-  const svService = new google.maps.StreetViewService()
-  svService.getPanorama({ location: dest, radius: 50 }, (data, status) => {
-    if (status !== "OK") byId("sv-panel").style.display = "none"
-  })
-
-  calculateAndDisplayRoute(dest, currentSelectedMsgId)
-  map.setCenter(dest)
-  map.setZoom(16)
-}
-
 async function runScan() {
   const r = parseInt(byId("rad").value, 10)
   const cRaw = byId("cat").value
@@ -921,7 +1114,8 @@ async function runScan() {
 
   circle.setRadius(r)
   directionsRenderer.setDirections({ routes: [] })
-  byId("sv-panel").style.display = "none"
+  const svPanel = byId("sv-panel")
+  if (svPanel) svPanel.style.display = "none"
   currentSelectedDest = null
   currentSelectedMsgId = null
 
@@ -949,12 +1143,13 @@ async function runScan() {
 
   const compactAll = res.slice(0, 80).map(p => {
     const photo = (p.photos && p.photos.length) ? p.photos[0].getUrl({ maxWidth: 120 }) : ""
+    const total = p.user_ratings_total != null ? Number(p.user_ratings_total) : 0
     return {
       place_id: p.place_id || "",
       name: p.name || "",
       vicinity: p.vicinity || "",
       rating: p.rating || "-",
-      reviewsCount: Number(p.user_ratings_total) || 0,
+      reviews_total: Number.isFinite(total) ? total : 0,
       dist: Math.round(p.realDist || 0),
       lat: p.geometry && p.geometry.location ? p.geometry.location.lat() : null,
       lng: p.geometry && p.geometry.location ? p.geometry.location.lng() : null,
@@ -985,8 +1180,8 @@ function calculateAndDisplayRoute(dest, msgId) {
   document.querySelectorAll(".route-info").forEach(e => e.style.display = "none")
   document.querySelectorAll(".transit-steps").forEach(e => e.innerHTML = "")
 
-  const div = byId(msgId)
-  const stepsDiv = byId(msgId.replace("route-msg-", "steps-"))
+  const div = msgId ? byId(msgId) : null
+  const stepsDiv = msgId ? byId(msgId.replace("route-msg-", "steps-")) : null
 
   if (div) {
     div.style.display = "block"
@@ -1006,9 +1201,9 @@ function calculateAndDisplayRoute(dest, msgId) {
             if (step.travel_mode === "TRANSIT" && step.transit) {
               const line = step.transit.line.short_name || step.transit.line.name
               const vehicle = (step.transit.line.vehicle && step.transit.line.vehicle.name) ? step.transit.line.vehicle.name : "Transit"
-              stepSummary += `<span class="step-badge" style="background:#2980b9">${vehicle} ${line}</span> `
+              stepSummary += `<span class="step-badge" style="background:#2980b9">${escapeHtml(vehicle)} ${escapeHtml(line || "")}</span> `
             } else if (step.travel_mode === "WALKING") {
-              stepSummary += `<span class="step-badge">🚶 ${step.duration.text}</span> `
+              stepSummary += `<span class="step-badge">🚶 ${escapeHtml(step.duration.text)}</span> `
             }
           })
           stepsDiv.innerHTML = stepSummary ? ("Traseu: " + stepSummary) : "Doar mers pe jos (prea aproape)."
@@ -1040,3 +1235,4 @@ byId("tabFavs")?.addEventListener("click", () => { setTab("favs"); renderFavs() 
 window.runScan = runScan
 window.locateUser = locateUser
 window.updateRouteMode = updateRouteMode
+window.openReviewsForPlaceId = openReviewsForPlaceId
