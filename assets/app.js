@@ -20,6 +20,7 @@ let currentSelectedMsgId = null
 const LS_FAVS = "atlasgo_favs_v2"
 const LS_HISTORY_RESULTS = "atlasgo_results_history_v1"
 const LS_STATE = "atlasgo_last_state_v2"
+const LS_HELP_DISMISSED = "atlasgo_help_dismissed_v1"
 
 const NOIMG_DATA_URL = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60">' +
@@ -42,6 +43,137 @@ function escapeHtml(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;")
+}
+
+function formatNumberRO(n) {
+  const num = Number(n)
+  if (!Number.isFinite(num)) return ""
+  return num.toLocaleString("ro-RO")
+}
+
+function setOverlayVisible(id, visible) {
+  const el = byId(id)
+  if (!el) return
+  el.style.display = visible ? "flex" : "none"
+  el.setAttribute("aria-hidden", visible ? "false" : "true")
+}
+
+function initOverlayUI() {
+  const reviewsOverlay = byId("reviewsOverlay")
+  const reviewsClose = byId("reviewsClose")
+  if (reviewsOverlay && reviewsClose) {
+    reviewsClose.addEventListener("click", () => setOverlayVisible("reviewsOverlay", false))
+    reviewsOverlay.addEventListener("click", (ev) => {
+      if (ev.target === reviewsOverlay) setOverlayVisible("reviewsOverlay", false)
+    })
+  }
+
+  const helpBtn = byId("helpBtn")
+  const helpOverlay = byId("helpOverlay")
+  const helpClose = byId("helpClose")
+  if (helpBtn && helpOverlay && helpClose) {
+    const dismissed = localStorage.getItem(LS_HELP_DISMISSED) === "1"
+    helpBtn.style.display = dismissed ? "none" : "block"
+
+    helpBtn.addEventListener("click", () => setOverlayVisible("helpOverlay", true))
+
+    const dismissHelp = () => {
+      setOverlayVisible("helpOverlay", false)
+      localStorage.setItem(LS_HELP_DISMISSED, "1")
+      helpBtn.style.display = "none"
+    }
+
+    helpClose.addEventListener("click", dismissHelp)
+    helpOverlay.addEventListener("click", (ev) => {
+      if (ev.target === helpOverlay) dismissHelp()
+    })
+  }
+}
+
+function formatReviewText(text) {
+  return escapeHtml(text || "").replaceAll("\n", "<br>")
+}
+
+function reviewTimeLabel(rv) {
+  if (rv && rv.relative_time_description) return String(rv.relative_time_description)
+  const t = rv && rv.time ? Number(rv.time) : NaN
+  if (Number.isFinite(t)) return new Date(t * 1000).toLocaleDateString("ro-RO")
+  return ""
+}
+
+function renderReviewItem(rv) {
+  const author = rv && rv.author_name ? String(rv.author_name) : "Utilizator"
+  const photo = rv && rv.profile_photo_url ? String(rv.profile_photo_url) : ""
+  const rating = Number(rv && rv.rating)
+  const ratingLabel = Number.isFinite(rating) ? rating.toFixed(1) : "-"
+  const time = reviewTimeLabel(rv)
+  const body = formatReviewText(rv && rv.text ? String(rv.text) : "")
+
+  return `
+    <div class="review-item">
+      <img class="review-avatar" src="${escapeHtml(photo || NOIMG_DATA_URL)}" referrerpolicy="no-referrer">
+      <div class="review-main">
+        <div class="review-headline">
+          <div class="review-author">${escapeHtml(author)}</div>
+          <div class="review-time">${escapeHtml(time)}</div>
+        </div>
+        <div class="review-rating">${escapeHtml(ratingLabel)} ★</div>
+        <div class="review-text">${body}</div>
+      </div>
+    </div>
+  `
+}
+
+function openReviewsForPlaceId(placeId, placeNameHint) {
+  if (!placeId || !service) return
+
+  const title = byId("reviewsTitle")
+  const meta = byId("reviewsMeta")
+  const body = byId("reviewsBody")
+
+  if (title) title.textContent = placeNameHint ? `Recenzii: ${placeNameHint}` : "Recenzii"
+  if (meta) meta.textContent = "Se încarcă..."
+  if (body) body.innerHTML = ""
+
+  setOverlayVisible("reviewsOverlay", true)
+
+  service.getDetails(
+    {
+      placeId: placeId,
+      fields: ["name", "rating", "user_ratings_total", "reviews", "url"]
+    },
+    (place, status) => {
+      if (status !== "OK" || !place) {
+        if (meta) meta.textContent = "Nu am putut încărca recenziile pentru această locație."
+        return
+      }
+
+      const name = place.name || placeNameHint || "Locație"
+      if (title) title.textContent = `Recenzii: ${name}`
+
+      const rating = Number(place.rating)
+      const ratingLabel = Number.isFinite(rating) ? rating.toFixed(1) : "-"
+
+      const total = Number(place.user_ratings_total)
+      const totalLabel = Number.isFinite(total) && total > 0 ? formatNumberRO(total) : "-"
+
+      const url = place.url ? String(place.url) : ""
+      const linkHtml = url
+        ? ` • <a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="color:#3b82f6; text-decoration:none;">Deschide în Google</a>`
+        : ""
+
+      if (meta) meta.innerHTML = `<span style="color:#f1c40f">${escapeHtml(ratingLabel)} ★</span> <span style="color:#888">(${escapeHtml(totalLabel)})</span>${linkHtml}`
+
+      const reviews = Array.isArray(place.reviews) ? place.reviews : []
+      if (!reviews.length) {
+        if (body) body.innerHTML = '<div class="hint">Google nu a furnizat recenzii pentru această locație.</div>'
+        return
+      }
+
+      const html = reviews.slice(0, 20).map(renderReviewItem).join("")
+      if (body) body.innerHTML = html
+    }
+  )
 }
 
 function getAuthUser() {
@@ -124,6 +256,7 @@ function toggleFav(placeObj) {
       name: placeObj.name || "",
       vicinity: placeObj.vicinity || "",
       rating: placeObj.rating || 0,
+      reviewsCount: Number(placeObj.reviewsCount) || 0,
       dist: Math.round(placeObj.realDist || 0),
       lat: placeObj.geometry && placeObj.geometry.location ? placeObj.geometry.location.lat() : null,
       lng: placeObj.geometry && placeObj.geometry.location ? placeObj.geometry.location.lng() : null,
@@ -179,12 +312,14 @@ function renderFavs() {
     }
 
     const thumb = f.photo ? f.photo : NOIMG_DATA_URL
+    const rc = Number(f.reviewsCount)
+    const rcLabel = Number.isFinite(rc) && rc > 0 ? ` (${formatNumberRO(rc)})` : ""
     card.innerHTML = `
       <img src="${thumb}" class="place-img">
       <div class="place-info">
         <div style="position:absolute; right:10px; top:8px; font-size:11px; color:#f1c40f;">★</div>
         <b>${escapeHtml(f.name)}</b><br>
-        <span style="color:#f1c40f">${(f.rating || 0).toFixed ? (f.rating || 0).toFixed(1) : (f.rating || 0)} ★</span> |
+        <span style="color:#f1c40f">${(f.rating || 0).toFixed ? (f.rating || 0).toFixed(1) : (f.rating || 0)} ★${escapeHtml(rcLabel)}</span> |
         <span style="color:#aaa; font-size:11px">${f.dist || 0}m</span>
         <div class="mini-muted" style="margin-top:4px;">${escapeHtml(f.vicinity || "")}</div>
       </div>
@@ -474,6 +609,8 @@ function initMap() {
   }
   showExitFocusButton(false)
 
+  initOverlayUI()
+
   setPaginationBarState()
 }
 
@@ -631,6 +768,8 @@ function renderResultsFromPlaces(places, totalCount) {
     const thumbUrl = p.photo ? p.photo : NOIMG_DATA_URL
     const favSymbol = (p.place_id && isFav(p.place_id)) ? "★" : "☆"
     const safePlaceId = (p.place_id || "").replace(/'/g, "")
+    const rc = Number(p.reviewsCount)
+    const rcLabel = Number.isFinite(rc) && rc > 0 ? ` (${formatNumberRO(rc)})` : ""
 
     const card = document.createElement("div")
     card.className = "card"
@@ -654,14 +793,15 @@ function renderResultsFromPlaces(places, totalCount) {
       <img src="${thumbUrl}" class="place-img">
       <div class="place-info">
         <b>${escapeHtml(p.name || "")}</b><br>
-        <span style="color:#f1c40f">${escapeHtml(String(p.rating || "-"))} ★</span> |
+        <span style="color:#f1c40f">${escapeHtml(String(p.rating || "-"))} ★${escapeHtml(rcLabel)}</span> |
         <span style="color:#aaa; font-size:11px">${escapeHtml(String(p.dist || 0))}m</span>
         <div class="mini-muted" style="margin-top:4px;">${escapeHtml(p.vicinity || "")}</div>
         <div id="route-msg-${idx}" class="route-info"></div>
         <div id="steps-${idx}" class="transit-steps"></div>
       </div>
       <div class="fav-btn" data-fav-id="${safePlaceId}" title="Favorite">${favSymbol}</div>
-      <div class="mini-action" title="Street View">👁️</div>
+      <div class="mini-action review-action" title="Recenzii">💬</div>
+      <div class="mini-action sv-action" title="Street View">👁️</div>
     `
 
     const favBtn = card.querySelector(".fav-btn")
@@ -672,14 +812,33 @@ function renderResultsFromPlaces(places, totalCount) {
         name: p.name,
         vicinity: p.vicinity,
         rating: Number(p.rating) || 0,
+        reviewsCount: Number(p.reviewsCount) || 0,
         realDist: Number(p.dist) || 0,
         geometry: { location: new google.maps.LatLng(p.lat, p.lng) },
         photos: p.photo ? [{ getUrl: () => p.photo }] : []
       })
     }
 
-    const svBtn = card.querySelector(".mini-action")
-    svBtn.onclick = (ev) => {
+    const reviewBtn = card.querySelector(".review-action")
+    if (reviewBtn) {
+      reviewBtn.onclick = (ev) => {
+        ev.stopPropagation()
+        if (!p.place_id) {
+          const title = byId("reviewsTitle")
+          const meta = byId("reviewsMeta")
+          const body = byId("reviewsBody")
+          if (title) title.textContent = "Recenzii"
+          if (meta) meta.textContent = "Acest rezultat nu are un identificator Google Places."
+          if (body) body.innerHTML = ""
+          setOverlayVisible("reviewsOverlay", true)
+          return
+        }
+        openReviewsForPlaceId(p.place_id, p.name || "")
+      }
+    }
+
+    const svBtn = card.querySelector(".sv-action")
+    if (svBtn) svBtn.onclick = (ev) => {
       ev.stopPropagation()
       if (p.lat == null || p.lng == null) return
       const dest = { lat: p.lat, lng: p.lng }
@@ -795,6 +954,7 @@ async function runScan() {
       name: p.name || "",
       vicinity: p.vicinity || "",
       rating: p.rating || "-",
+      reviewsCount: Number(p.user_ratings_total) || 0,
       dist: Math.round(p.realDist || 0),
       lat: p.geometry && p.geometry.location ? p.geometry.location.lat() : null,
       lng: p.geometry && p.geometry.location ? p.geometry.location.lng() : null,
